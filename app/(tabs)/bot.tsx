@@ -504,10 +504,10 @@ export default function BotScreen() {
       console.log("Loaded history data:", data);
       
       // Convert API response to Message format
-      const loadedMessages: Message[] = data.messages.map((msg: any, index: number) => ({
+      const loadedMessages: Message[] = data.history.map((msg: any, index: number) => ({
         id: `${sessionId}-${index}`,
         type: msg.role === "user" ? "user" : "bot",
-        content: msg.content,
+        content: msg.message,
         timestamp: new Date(),
       }));
 
@@ -553,12 +553,14 @@ export default function BotScreen() {
                 resizeMode="cover"
               />
             )}
-            <Text style={[styles.messageText, isUser ? styles.userText : styles.botText]}>
-              {item.content}
-            </Text>
-            <Text style={[styles.timestamp, isUser ? styles.userTimestamp : styles.botTimestamp]}>
-              {item.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-            </Text>
+            <View style={styles.messageContentWrapper}>
+              <Text style={[styles.messageText, isUser ? styles.userText : styles.botText]}>
+                {item.content}
+              </Text>
+              <Text style={[styles.timestamp, isUser ? styles.userTimestamp : styles.botTimestamp]}>
+                {item.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </Text>
+            </View>
           </View>
 
           {/* Action buttons - Like, Dislike, Voice (only for bot messages) */}
@@ -812,10 +814,14 @@ const styles = StyleSheet.create({
   userContainer: {
     justifyContent: "flex-end",
     marginLeft: "auto",
+    marginRight: 0,
+    width: "100%",
   },
   botContainer: {
     justifyContent: "flex-start",
     marginRight: "auto",
+    marginLeft: 0,
+    width: "100%",
   },
   botIcon: {
     width: 32,
@@ -836,8 +842,10 @@ const styles = StyleSheet.create({
   messageBubble: {
     maxWidth: "60%",
     paddingHorizontal: 14,
-    paddingVertical: 11,
+    paddingVertical: 8,
     borderRadius: 18,
+    justifyContent: "center",
+    alignItems: "flex-start",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
@@ -845,13 +853,14 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   userMessage: {
-    backgroundColor: "#d3d3d3",
-    maxWidth: "60%",
+    backgroundColor: "#b3b3b3",
+    maxWidth: "70%",
+    marginLeft: "auto",
   },
   botMessage: {
     backgroundColor: "#fff",
     borderWidth: 0,
-    maxWidth: "85%",
+    maxWidth: "100%",
   },
   messageText: {
     fontSize: 15,
@@ -859,21 +868,25 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   userText: {
-    color: "#666",
-    fontSize: 13,
+    color: "#000",
+    fontSize: 15,
   },
   botText: {
     color: "#333",
     fontSize: 16,
     fontWeight: "500",
   },
+  messageContentWrapper: {
+    width: "100%",
+  },
   timestamp: {
     fontSize: 11,
-    marginTop: 3,
+    marginTop: 4,
     fontWeight: "400",
+    textAlign: "right",
   },
   userTimestamp: {
-    color: "rgba(255, 255, 255, 0.8)",
+    color: "rgba(0, 0, 0, 0.6)",
     textAlign: "right",
   },
   botTimestamp: {
