@@ -208,7 +208,7 @@ export default function StatScreen() {
 
                 {/* Min - Max */}
                 <View style={styles.statsRow}>
-                  <Text style={styles.statKey}>Min - Max:</Text>
+                  <Text style={styles.statKey}>Tối thiểu - Tối đa:</Text>
                   <Text style={styles.statVal}>
                     {stat.min} - {stat.max} {stat.latest?.unit1}
                   </Text>

@@ -14,8 +14,8 @@ export const DISEASE_LIST: Disease[] = [
   },
   {
     id: "diabetes",
-    name: "Tiểu đường",
-    icon: "water-drop",
+    name: "Đái tháo đường",
+    icon: "beaker",
     color: "#FFA500",
     description: "Đo đường huyết",
     fields: [

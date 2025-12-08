@@ -12,7 +12,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "Trang chủ",
           tabBarIcon: ({ color }: { color: string }) => (
             <MaterialCommunityIcons name="home" size={24} color={color} />
           ),
@@ -22,7 +22,7 @@ export default function TabsLayout() {
     <Tabs.Screen
         name="stat"
         options={{
-          title: "Statistics",
+          title: "Trực quan",
           tabBarIcon: ({ color }: { color: string }) => (
             <MaterialCommunityIcons name="chart-line" size={24} color={color} />
           ),
@@ -42,7 +42,7 @@ export default function TabsLayout() {
     <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          title: "Hồ sơ",
           tabBarIcon: ({ color }: { color: string }) => (
             <MaterialCommunityIcons name="account" size={24} color={color} />
           ),

@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Switch,
+  Modal,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAuth } from "../../src/contexts/auth-context";
@@ -22,6 +24,19 @@ export default function ProfileScreen() {
   const [height, setHeight] = useState("170");
   const [weight, setWeight] = useState("70");
   const [age, setAge] = useState("25");
+
+  // Modal states
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [showPrivacySecurity, setShowPrivacySecurity] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+
+  // Settings toggles
+  const [settings, setSettings] = useState({
+    pushNotifications: true,
+    reminders: true,
+    emailNotifications: true,
+    twoFactorAuth: false,
+  });
 
   const handleSaveProfile = () => {
     setIsEditing(false);
@@ -188,7 +203,7 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Settings</Text>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity style={styles.settingItem} onPress={() => setShowNotifications(true)}>
             <View style={styles.settingLeft}>
               <MaterialCommunityIcons
                 name="bell"
@@ -200,7 +215,7 @@ export default function ProfileScreen() {
             <MaterialCommunityIcons name="chevron-right" size={24} color="#999" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity style={styles.settingItem} onPress={() => setShowPrivacySecurity(true)}>
             <View style={styles.settingLeft}>
               <MaterialCommunityIcons
                 name="lock"
@@ -212,7 +227,7 @@ export default function ProfileScreen() {
             <MaterialCommunityIcons name="chevron-right" size={24} color="#999" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.settingItem}>
+          <TouchableOpacity style={styles.settingItem} onPress={() => setShowHelp(true)}>
             <View style={styles.settingLeft}>
               <MaterialCommunityIcons
                 name="help-circle"
@@ -240,6 +255,170 @@ export default function ProfileScreen() {
 
         <View style={styles.footer} />
       </ScrollView>
+
+      {/* Notifications Modal */}
+      <Modal
+        visible={showNotifications}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowNotifications(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Notifications</Text>
+              <TouchableOpacity onPress={() => setShowNotifications(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              <View style={styles.settingRow}>
+                <View>
+                  <Text style={styles.settingLabel}>Push Notifications</Text>
+                  <Text style={styles.settingDescription}>Receive health alerts and updates</Text>
+                </View>
+                <Switch
+                  value={settings.pushNotifications}
+                  onValueChange={(value) => setSettings({...settings, pushNotifications: value})}
+                  trackColor={{ false: "#767577", true: "#81C784" }}
+                  thumbColor={settings.pushNotifications ? "#007AFF" : "#f4f3f4"}
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <View>
+                  <Text style={styles.settingLabel}>Reminders</Text>
+                  <Text style={styles.settingDescription}>Daily reminders to log your health data</Text>
+                </View>
+                <Switch
+                  value={settings.reminders}
+                  onValueChange={(value) => setSettings({...settings, reminders: value})}
+                  trackColor={{ false: "#767577", true: "#81C784" }}
+                  thumbColor={settings.reminders ? "#007AFF" : "#f4f3f4"}
+                />
+              </View>
+
+              <View style={styles.settingRow}>
+                <View>
+                  <Text style={styles.settingLabel}>Email Notifications</Text>
+                  <Text style={styles.settingDescription}>Weekly health summary emails</Text>
+                </View>
+                <Switch
+                  value={settings.emailNotifications}
+                  onValueChange={(value) => setSettings({...settings, emailNotifications: value})}
+                  trackColor={{ false: "#767577", true: "#81C784" }}
+                  thumbColor={settings.emailNotifications ? "#007AFF" : "#f4f3f4"}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Privacy & Security Modal */}
+      <Modal
+        visible={showPrivacySecurity}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPrivacySecurity(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Privacy & Security</Text>
+              <TouchableOpacity onPress={() => setShowPrivacySecurity(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              <TouchableOpacity style={styles.actionButton}>
+                <MaterialCommunityIcons name="lock-reset" size={20} color="#007AFF" />
+                <Text style={styles.actionButtonText}>Change Password</Text>
+              </TouchableOpacity>
+
+              <View style={styles.settingRow}>
+                <View>
+                  <Text style={styles.settingLabel}>Two-Factor Authentication</Text>
+                  <Text style={styles.settingDescription}>Add extra security to your account</Text>
+                </View>
+                <Switch
+                  value={settings.twoFactorAuth}
+                  onValueChange={(value) => setSettings({...settings, twoFactorAuth: value})}
+                  trackColor={{ false: "#767577", true: "#81C784" }}
+                  thumbColor={settings.twoFactorAuth ? "#007AFF" : "#f4f3f4"}
+                />
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.dangerButton]}
+                onPress={() => {
+                  Alert.alert(
+                    "Delete Account",
+                    "Are you sure? This action cannot be undone.",
+                    [
+                      { text: "Cancel", onPress: () => {} },
+                      { text: "Delete", onPress: () => Alert.alert("Account deleted"), style: "destructive" }
+                    ]
+                  );
+                }}
+              >
+                <MaterialCommunityIcons name="trash-can" size={20} color="#FF3B30" />
+                <Text style={styles.dangerButtonText}>Delete Account</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Help & Support Modal */}
+      <Modal
+        visible={showHelp}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowHelp(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Help & Support</Text>
+              <TouchableOpacity onPress={() => setShowHelp(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#333" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              <TouchableOpacity style={styles.actionButton}>
+                <MaterialCommunityIcons name="frequently-asked-questions" size={20} color="#007AFF" />
+                <Text style={styles.actionButtonText}>FAQ</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.actionButton}>
+                <MaterialCommunityIcons name="email-outline" size={20} color="#007AFF" />
+                <Text style={styles.actionButtonText}>Contact Support</Text>
+              </TouchableOpacity>
+
+              <View style={styles.infoBox}>
+                <Text style={styles.infoLabel}>App Version</Text>
+                <Text style={styles.infoValue}>v1.0.0</Text>
+                <Text style={styles.infoLabel} style={{marginTop: 12}}>Build</Text>
+                <Text style={styles.infoValue}>1</Text>
+              </View>
+
+              <TouchableOpacity style={styles.actionButton}>
+                <MaterialCommunityIcons name="file-document-outline" size={20} color="#007AFF" />
+                <Text style={styles.actionButtonText}>Privacy Policy</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.actionButton}>
+                <MaterialCommunityIcons name="file-check-outline" size={20} color="#007AFF" />
+                <Text style={styles.actionButtonText}>Terms of Service</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -367,5 +546,90 @@ const styles = StyleSheet.create({
   },
   footer: {
     height: 20,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "#f5f5f5",
+  },
+  modalContent: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: 70,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f5f5f5",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  modalBody: {
+    padding: 16,
+  },
+  settingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f5f5f5",
+  },
+  settingLabel: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+  },
+  settingDescription: {
+    fontSize: 13,
+    color: "#999",
+    marginTop: 4,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    backgroundColor: "#f5f5f5",
+    borderRadius: 10,
+    marginBottom: 12,
+    gap: 12,
+  },
+  actionButtonText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#007AFF",
+  },
+  dangerButton: {
+    backgroundColor: "#FFE5E5",
+    marginTop: 20,
+  },
+  dangerButtonText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#FF3B30",
+  },
+  infoBox: {
+    backgroundColor: "#f5f5f5",
+    padding: 16,
+    borderRadius: 10,
+    marginVertical: 12,
+  },
+  infoLabel: {
+    fontSize: 13,
+    color: "#999",
+    fontWeight: "500",
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginTop: 4,
   },
 });
