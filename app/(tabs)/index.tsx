@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Dimensions } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Dimensions, ImageBackground } from "react-native";
 import { Card } from "react-native-paper";
 import { useAuth } from "@/src/contexts/auth-context";
 import { useState, useEffect, useRef } from "react";
@@ -30,6 +30,20 @@ export default function HomeScreen() {
       }),
     ]).start();
   }, []);
+
+  const getGreetingIcon = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "white-balance-sunny"; // Morning sun
+    if (hour < 17) return "weather-partly-cloudy"; // Afternoon
+    return "moon-waning-crescent"; // Evening moon
+  };
+
+  const getGreetingBackground = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return require("@/assets/images/morning.png");
+    if (hour < 17) return require("@/assets/images/afternoon.png");
+    return require("@/assets/images/evening.png");
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -87,7 +101,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-      {/* Animated Greeting Header */}
+      {/* Animated Greeting Header */}c
       <Animated.View
         style={[
           styles.greetingSection,
@@ -97,22 +111,17 @@ export default function HomeScreen() {
           },
         ]}
       >
-        <View style={styles.greetingContainer}>
-          <View>
-            <Text style={[styles.greeting, { color: getGreetingColor() }]}>{getGreeting()} 👋</Text>
-            <Text style={styles.userName}>{capitalizeName(user?.name || "User")}</Text>
-            <Text style={styles.dateTime}>
-              {new Date().toLocaleDateString("vi-VN", {
-                weekday: "long",
-              })} • {getTimeString()}
-            </Text>
+        <ImageBackground
+          source={getGreetingBackground()}
+          style={styles.greetingBackground}
+          imageStyle={styles.greetingBackgroundImage}
+        >
+          <View style={styles.greetingOverlay}>
+            <View style={styles.greetingContainer}>
+              <Text style={styles.userName}>{capitalizeName(user?.name || "User")}</Text>
+            </View>
           </View>
-          <MaterialCommunityIcons
-            name="heart-pulse"
-            size={48}
-            color="#007AFF"
-          />
-        </View>
+        </ImageBackground>
       </Animated.View>
 
       {/* Latest Alert/Notification Banner */}
@@ -266,23 +275,39 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   greetingSection: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 20,
+    backgroundColor: "transparent",
+    paddingHorizontal: 16,
     paddingTop: 50,
-    paddingBottom: 20,
-    borderBottomWidth: 3,
-    borderBottomColor: "#007AFF",
+    paddingBottom: 12,
+  },
+  greetingBackground: {
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    height: 150,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  greetingBackgroundImage: {
+    borderRadius: 16,
+  },
+  greetingOverlay: {
+    backgroundColor: "transparent",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
   },
   greetingContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: "column",
+    justifyContent: "flex-start",
     alignItems: "flex-start",
-    gap: 12,
+    gap: 2,
+    paddingHorizontal: 0,
   },
   greeting: {
-    fontSize: 24,
-    fontWeight: "700",
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 2,
+    color: "#fff",
   },
   timeDisplay: {
     fontSize: 13,
@@ -291,10 +316,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   userName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 2,
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#fff",
+    marginBottom: 0,
   },
   date: {
     fontSize: 12,

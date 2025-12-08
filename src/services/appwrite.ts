@@ -25,6 +25,9 @@ export const HABITS_COLLECTION_ID =
 export const COMPLETIONS_COLLECTION_ID =
   process.env.EXPO_PUBLIC_COMPLETION_COLLECTION_ID!;
 
+export const SESSIONS_COLLECTION_ID =
+  process.env.EXPO_PUBLIC_CHAT_SESSIONS_COLLECTION_ID!;
+
 export interface RealTimeResponse {
   events: string[];
   payload: any;

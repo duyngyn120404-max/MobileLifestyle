@@ -34,6 +34,9 @@ export interface Message {
   type: "user" | "bot";
   content: string;
   timestamp: Date;
+  image?: string;
+  liked?: boolean;
+  disliked?: boolean;
 }
 
 export interface ChatSession {
