@@ -1,7 +1,7 @@
 // API Configuration
 // Change API_BASE_URL based on your environment
 
-const API_BASE_URL = "https://semisecretly-unmimetic-shelley.ngrok-free.dev"; // ngrok public URL
+const API_BASE_URL = "https://semisecretly-unmimetic-shelley.ngrok-free.dev"; 
 
 export const API_ENDPOINTS = {
   CHAT: `${API_BASE_URL}/chat`,
