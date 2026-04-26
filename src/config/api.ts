@@ -1,7 +1,7 @@
 // API Configuration
 // Change API_BASE_URL based on your environment
 
-const API_BASE_URL = "https://semisecretly-unmimetic-shelley.ngrok-free.dev"; 
+const API_BASE_URL = "https://tremendously-adiaphoristic-winston.ngrok-free.dev"; 
 
 export const API_ENDPOINTS = {
   CHAT: `${API_BASE_URL}/chat`,
@@ -10,4 +10,4 @@ export const API_ENDPOINTS = {
 };
 
 export default API_ENDPOINTS;
-    
+        

@@ -101,7 +101,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-      {/* Animated Greeting Header */}c
+      {/* Animated Greeting Header */}
       <Animated.View
         style={[
           styles.greetingSection,
