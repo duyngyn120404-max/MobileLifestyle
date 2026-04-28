@@ -2,31 +2,15 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions } fro
 import { Card, SegmentedButtons } from "react-native-paper";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/src/contexts/auth-context";
-import { databases, DATABASE_ID, HEALTH_RECORDS_COLLECTION_ID } from "@/src/services/appwrite";
-import { Query } from "react-native-appwrite";
+import { useHealthController } from "@/src/controllers/useHealthController";
+import type { HealthRecord } from "@/src/repositories/health.repository";
 import { LineChart } from "react-native-chart-kit";
 
 const screenWidth = Dimensions.get("window").width;
 
-interface HealthRecord {
-  $id: string;
-  userId: string;
-  diseaseId: string;
-  diseaseName: string;
-  value1: number;
-  value2?: number;
-  value3?: number;
-  value4?: number;
-  unit1: string;
-  unit2?: string;
-  unit3?: string;
-  unit4?: string;
-  recordDate: string;
-}
-
 interface StatisticData {
-  diseaseId: string;
-  diseaseName: string;
+  disease_id: string;
+  disease_name: string;
   count: number;
   average: number;
   min: number;
@@ -36,91 +20,40 @@ interface StatisticData {
 
 export default function StatScreen() {
   const { user } = useAuth();
+  const { records, isLoading, loadRecords } = useHealthController();
   const [filterRange, setFilterRange] = useState<"day" | "week" | "month">("week");
   const [statistics, setStatistics] = useState<StatisticData[]>([]);
-  const [allRecords, setAllRecords] = useState<HealthRecord[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      fetchStatistics();
+    if (user?.id) {
+      const days = filterRange === "day" ? 1 : filterRange === "week" ? 7 : 30;
+      loadRecords(user.id, days);
     }
-  }, [user, filterRange]);
+  }, [user?.id, filterRange]);
 
-  const getDateRange = () => {
-    const now = new Date();
-    const start = new Date();
+  useEffect(() => {
+    const groupedData: Record<string, HealthRecord[]> = {};
+    records.forEach(record => {
+      if (!groupedData[record.disease_id]) groupedData[record.disease_id] = [];
+      groupedData[record.disease_id].push(record);
+    });
 
-    switch (filterRange) {
-      case "day":
-        start.setDate(now.getDate() - 1);
-        break;
-      case "week":
-        start.setDate(now.getDate() - 7);
-        break;
-      case "month":
-        start.setDate(now.getDate() - 30);
-        break;
-    }
+    const stats: StatisticData[] = Object.entries(groupedData).map(([disease_id, recs]) => {
+      const values = recs.map(r => r.value1);
+      const average = values.reduce((a, b) => a + b, 0) / values.length;
+      return {
+        disease_id,
+        disease_name: recs[0].disease_name,
+        count: recs.length,
+        average: parseFloat(average.toFixed(2)),
+        min: Math.min(...values),
+        max: Math.max(...values),
+        latest: recs[0],
+      };
+    });
 
-    return start.toISOString();
-  };
-
-  const fetchStatistics = async () => {
-    if (!user) return;
-
-    setIsLoading(true);
-    try {
-      const startDate = getDateRange();
-      const query = [
-        Query.equal("userId", user.$id),
-        Query.greaterThanEqual("recordDate", startDate),
-        Query.orderDesc("recordDate"),
-      ];
-
-      const response = await databases.listDocuments(
-        DATABASE_ID,
-        HEALTH_RECORDS_COLLECTION_ID,
-        query
-      );
-
-      setAllRecords(response.documents as any);
-
-      // Group by diseaseId and calculate statistics
-      const groupedData: { [key: string]: HealthRecord[] } = {};
-      response.documents.forEach((record: any) => {
-        if (!groupedData[record.diseaseId]) {
-          groupedData[record.diseaseId] = [];
-        }
-        groupedData[record.diseaseId].push(record);
-      });
-
-      const stats: StatisticData[] = Object.entries(groupedData).map(
-        ([diseaseId, records]) => {
-          const values = records.map((r) => r.value1);
-          const average = values.reduce((a, b) => a + b, 0) / values.length;
-          const min = Math.min(...values);
-          const max = Math.max(...values);
-
-          return {
-            diseaseId,
-            diseaseName: records[0].diseaseName,
-            count: records.length,
-            average: parseFloat(average.toFixed(2)),
-            min,
-            max,
-            latest: records[0],
-          };
-        }
-      );
-
-      setStatistics(stats);
-    } catch (error) {
-      console.error("Error fetching statistics:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    setStatistics(stats);
+  }, [records]);
 
   const getFilterLabel = () => {
     switch (filterRange) {
@@ -187,44 +120,33 @@ export default function StatScreen() {
           {/* Disease Statistics */}
           <Text style={styles.sectionTitle}>Thống kê theo bệnh</Text>
           {statistics.map((stat) => (
-            <Card key={stat.diseaseId} style={styles.diseaseCard}>
+            <Card key={stat.disease_id} style={styles.diseaseCard}>
               <Card.Content>
-                {/* Disease Name */}
-                <Text style={styles.diseaseName}>{stat.diseaseName}</Text>
+                <Text style={styles.diseaseName}>{stat.disease_name}</Text>
 
-                {/* Records Count */}
                 <View style={styles.statsRow}>
                   <Text style={styles.statKey}>Bản ghi:</Text>
                   <Text style={styles.statVal}>{stat.count}</Text>
                 </View>
 
-                {/* Average */}
                 <View style={styles.statsRow}>
                   <Text style={styles.statKey}>Trung bình:</Text>
-                  <Text style={styles.statVal}>
-                    {stat.average} {stat.latest?.unit1}
-                  </Text>
+                  <Text style={styles.statVal}>{stat.average} {stat.latest?.unit1}</Text>
                 </View>
 
-                {/* Min - Max */}
                 <View style={styles.statsRow}>
                   <Text style={styles.statKey}>Tối thiểu - Tối đa:</Text>
-                  <Text style={styles.statVal}>
-                    {stat.min} - {stat.max} {stat.latest?.unit1}
-                  </Text>
+                  <Text style={styles.statVal}>{stat.min} - {stat.max} {stat.latest?.unit1}</Text>
                 </View>
 
-                {/* Latest Value */}
                 <View style={[styles.statsRow, styles.latestRow]}>
                   <Text style={styles.statKey}>Lần cuối:</Text>
-                  <Text style={styles.statVal}>
-                    {stat.latest?.value1} {stat.latest?.unit1}
-                  </Text>
+                  <Text style={styles.statVal}>{stat.latest?.value1} {stat.latest?.unit1}</Text>
                 </View>
 
                 <Text style={styles.timeText}>
-                  {stat.latest?.recordDate
-                    ? new Date(stat.latest.recordDate).toLocaleDateString("vi-VN")
+                  {stat.latest?.record_date
+                    ? new Date(stat.latest.record_date).toLocaleDateString("vi-VN")
                     : ""}
                 </Text>
               </Card.Content>
@@ -236,34 +158,25 @@ export default function StatScreen() {
           {statistics.length > 0 && (
             <>
               {statistics.map((stat) => {
-                // Filter records for this disease
-                const diseaseRecords = allRecords
-                  .filter((r) => r.diseaseId === stat.diseaseId)
+                const diseaseRecords = records
+                  .filter((r) => r.disease_id === stat.disease_id)
                   .slice(0, 10)
                   .reverse();
 
                 if (diseaseRecords.length === 0) return null;
 
-                // Colors for different diseases
-                const colors = [
-                  "#0066cc",
-                  "#ff6b6b",
-                  "#ffa500",
-                  "#4ecdc4",
-                  "#95e1d3",
-                ];
-                const colorIndex = statistics.indexOf(stat) % colors.length;
-                const lineColor = colors[colorIndex];
+                const colors = ["#0066cc", "#ff6b6b", "#ffa500", "#4ecdc4", "#95e1d3"];
+                const lineColor = colors[statistics.indexOf(stat) % colors.length];
 
                 return (
-                  <Card key={stat.diseaseId} style={styles.chartCard}>
-                    <Text style={styles.diseaseTrendTitle}>{stat.diseaseName}</Text>
+                  <Card key={stat.disease_id} style={styles.chartCard}>
+                    <Text style={styles.diseaseTrendTitle}>{stat.disease_name}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                       <LineChart
                         data={{
                           labels: diseaseRecords
                             .map((r) =>
-                              new Date(r.recordDate).toLocaleDateString("vi-VN", {
+                              new Date(r.record_date).toLocaleDateString("vi-VN", {
                                 month: "2-digit",
                                 day: "2-digit",
                               })

@@ -1,37 +1,31 @@
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
 import { Button, TextInput, Snackbar } from "react-native-paper";
-import { useLocalSearchParams } from "expo-router";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { DISEASE_LIST } from "@/src/constants/diseases";
 import { useAuth } from "@/src/contexts/auth-context";
-import { databases, DATABASE_ID, HEALTH_RECORDS_COLLECTION_ID } from "@/src/services/appwrite";
-import { ID } from "react-native-appwrite";
+import { useHealthController } from "@/src/controllers/useHealthController";
 
 export default function DiseaseInputScreen() {
   const { diseaseId, diseaseName } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { submitRecord, isLoading } = useHealthController();
+
   const id = (diseaseId as string) || "blood-pressure";
   const name = (diseaseName as string) || "Huyết áp";
-
   const disease = DISEASE_LIST.find(d => d.id === id);
-  const [data, setData] = useState<{ [key: string]: string }>({});
-  const [isLoading, setIsLoading] = useState(false);
+
+  const [formData, setFormData] = useState<Record<string, string>>({});
   const [snackVisible, setSnackVisible] = useState(false);
   const [snackMessage, setSnackMessage] = useState("");
   const [isError, setIsError] = useState(false);
 
   const handleInputChange = (fieldName: string, value: string) => {
-    setData(prev => ({
-      ...prev,
-      [fieldName]: value,
-    }));
+    setFormData(prev => ({ ...prev, [fieldName]: value }));
   };
 
   const handleSubmit = async () => {
-    // Validate user logged in
     if (!user) {
       setSnackMessage("Vui lòng đăng nhập trước");
       setIsError(true);
@@ -39,69 +33,28 @@ export default function DiseaseInputScreen() {
       return;
     }
 
-    // Validate all fields are filled
-    const fields = disease?.fields || [];
-    const emptyFields = fields.filter(field => !data[field.name]?.trim());
-    
-    if (emptyFields.length > 0) {
-      setSnackMessage("Vui lòng điền đầy đủ các trường");
+    if (!disease) return;
+
+    const result = await submitRecord(user.id, disease, formData);
+
+    if (!result.success) {
+      setSnackMessage(result.error || "Lỗi khi lưu dữ liệu");
       setIsError(true);
       setSnackVisible(true);
       return;
     }
 
-    setIsLoading(true);
-    try {
-      // Prepare data for database
-      const recordData: any = {
-        userId: user.$id,
-        diseaseId: id,
-        diseaseName: name,
-        recordDate: new Date().toISOString(),
-      };
-
-      // Map form data to value1-4 and unit1-4
-      fields.forEach((field, index) => {
-        const fieldNum = index + 1;
-        recordData[`value${fieldNum}`] = parseFloat(data[field.name]) || 0;
-        recordData[`unit${fieldNum}`] = field.unit;
-      });
-
-      // Save to Appwrite
-      await databases.createDocument(
-        DATABASE_ID,
-        HEALTH_RECORDS_COLLECTION_ID,
-        ID.unique(),
-        recordData
-      );
-
-      setSnackMessage(`✅ Lưu thành công ${name}`);
-      setIsError(false);
-      setSnackVisible(true);
-
-      // Navigate back after success
-      setTimeout(() => {
-        router.back();
-      }, 1500);
-
-    } catch (error: any) {
-      console.error('Error saving health record:', error);
-      setSnackMessage(error?.message || "Lỗi khi lưu dữ liệu");
-      setIsError(true);
-      setSnackVisible(true);
-    } finally {
-      setIsLoading(false);
-    }
+    setSnackMessage(`✅ Lưu thành công ${name}`);
+    setIsError(false);
+    setSnackVisible(true);
+    setTimeout(() => router.back(), 1500);
   };
 
   const getKeyboardType = (type: string) => {
     switch (type) {
-      case "decimal":
-        return "decimal-pad";
-      case "number":
-        return "number-pad";
-      default:
-        return "default";
+      case "decimal": return "decimal-pad";
+      case "number": return "number-pad";
+      default: return "default";
     }
   };
 
@@ -112,12 +65,7 @@ export default function DiseaseInputScreen() {
     >
       <ScrollView style={styles.scrollView}>
         <View style={styles.header}>
-          <Button
-            icon="arrow-left"
-            mode="text"
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
+          <Button icon="arrow-left" mode="text" onPress={() => router.back()} style={styles.backButton}>
             Trở về
           </Button>
           <Text style={styles.title}>{disease?.name || name}</Text>
@@ -131,7 +79,7 @@ export default function DiseaseInputScreen() {
               <View style={styles.inputContainer}>
                 <TextInput
                   placeholder={field.placeholder}
-                  value={data[field.name] || ""}
+                  value={formData[field.name] || ""}
                   onChangeText={(value) => handleInputChange(field.name, value)}
                   keyboardType={getKeyboardType(field.type)}
                   style={styles.input}
@@ -157,9 +105,7 @@ export default function DiseaseInputScreen() {
         visible={snackVisible}
         onDismiss={() => setSnackVisible(false)}
         duration={isError ? 3000 : 2000}
-        style={{
-          backgroundColor: isError ? "#d32f2f" : "#4caf50",
-        }}
+        style={{ backgroundColor: isError ? "#d32f2f" : "#4caf50" }}
       >
         {snackMessage}
       </Snackbar>
@@ -168,70 +114,19 @@ export default function DiseaseInputScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  scrollView: {
-    padding: 16,
-  },
-  header: {
-    marginBottom: 24,
-    marginTop: 8,
-  },
-  backButton: {
-    alignSelf: "flex-start",
-    marginTop: 40,
-    marginLeft: -8,
-    transform: [{ scale: 1.2 }],
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 8,
-    color: "#333",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#666",
-  },
-  form: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 8,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  input: {
-    flex: 1,
-    marginRight: 8,
-    borderRadius: 20,
-  },
-  unit: {
-    fontSize: 12,
-    color: "#999",
-    fontWeight: "500",
-    minWidth: 50,
-    textAlign: "right",
-  },
-  submitButton: {
-    marginTop: 16,
-    paddingVertical: 8,
-  },
+  container: { flex: 1, backgroundColor: "#f5f5f5" },
+  scrollView: { padding: 16 },
+  header: { marginBottom: 24, marginTop: 8 },
+  backButton: { alignSelf: "flex-start", marginTop: 40, marginLeft: -8, transform: [{ scale: 1.2 }] },
+  title: { fontSize: 28, fontWeight: "bold", marginBottom: 8, color: "#333" },
+  subtitle: { fontSize: 14, color: "#666" },
+  form: { backgroundColor: "#fff", borderRadius: 12, padding: 16, marginBottom: 20 },
+  inputGroup: { marginBottom: 16 },
+  label: { fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 8 },
+  inputContainer: { flexDirection: "row", alignItems: "center" },
+  input: { flex: 1, marginRight: 8, borderRadius: 20 },
+  unit: { fontSize: 12, color: "#999", fontWeight: "500", minWidth: 50, textAlign: "right" },
+  submitButton: { marginTop: 16, paddingVertical: 8 },
 });
 
-export const screenOptions = {
-  headerShown: false,
-};
+export const screenOptions = { headerShown: false };

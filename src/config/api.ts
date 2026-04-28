@@ -1,13 +1,17 @@
-// API Configuration
-// Change API_BASE_URL based on your environment
+const API_BASE_URL = "http://localhost:8001/api/v1";
 
-const API_BASE_URL = "https://tremendously-adiaphoristic-winston.ngrok-free.dev"; 
+export const API_ROUTES = {
+  // Conversations
+  CONVERSATIONS: "/conversations",
+  CONVERSATION: (id: string) => `/conversations/${id}`,
+  MESSAGES: (conversationId: string) => `/conversations/${conversationId}/messages`,
 
-export const API_ENDPOINTS = {
-  CHAT: `${API_BASE_URL}/chat`,
-  TRANSCRIBE: `${API_BASE_URL}/transcribe`,
-  HISTORY: (sessionId: string) => `${API_BASE_URL}/history/${sessionId}`,
-};
+  // Healthcare
+  GENERATE_HEALTHCARE_REPORT: "/generate_healthcare_report",
 
-export default API_ENDPOINTS;
-        
+  // Ingestion
+  INGEST: "/ingest",
+  INGEST_REVIEW: "/ingest/review",
+} as const;
+
+export { API_BASE_URL };

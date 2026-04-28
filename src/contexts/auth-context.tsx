@@ -1,9 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { ID, Models } from 'react-native-appwrite';
-import { account } from '@/src/services/appwrite';
+import { User } from '@supabase/supabase-js';
+import { supabase } from '@/src/services/supabase';
 
 type AuthContextType = {
-    user: Models.User<Models.Preferences> | null;
+    user: User | null;
     isLoadingUser: boolean;
     signUp: (email: string, password: string, fullName: string) => Promise<string | null>;
     signIn: (email: string, password: string) => Promise<string | null>;
@@ -13,17 +13,28 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
  
 export function AuthProvider({children}: {children: React.ReactNode}) {
-    const [user, setUser] = useState<Models.User<Models.Preferences> | null>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [isLoadingUser, setIsLoadingUser] = useState(true);
 
     useEffect(() => {
         getUser();
+        
+        // Listen to auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+            async (_event, session) => {
+                setUser(session?.user ?? null);
+            }
+        );
+
+        return () => {
+            subscription?.unsubscribe();
+        };
     }, []);
 
     const getUser = async () => {
-        try{
-            const session = await account.get();
-            setUser(session)
+        try {
+            const { data: { user: sessionUser } } = await supabase.auth.getUser();
+            setUser(sessionUser ?? null);
         } catch(error) {
             setUser(null);
         } finally {
@@ -33,14 +44,34 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
 
     const signUp = async (email: string, password: string, fullName: string) => {
         try {
-            await account.create(ID.unique(), email, password, fullName);
-            
-            await account.createEmailPasswordSession(email, password)
-            
-            // Lấy user info
-            const currentUser = await account.get();
-            setUser(currentUser);
-            
+            // Sign up with Supabase Auth
+            const { data: { user: newUser }, error: signUpError } = await supabase.auth.signUp({
+                email,
+                password,
+            });
+
+            if (signUpError) {
+                return signUpError.message;
+            }
+
+            if (!newUser?.id) {
+                return "Failed to create user account";
+            }
+
+            // Create user profile in users table using UUID from auth
+            const { error: profileError } = await supabase
+                .from('users')
+                .insert({
+                    id: newUser.id,
+                    full_name: fullName,
+                    email: email,
+                });
+
+            if (profileError) {
+                return profileError.message;
+            }
+
+            setUser(newUser);
             return null;
         } catch (error) {
             if (error instanceof Error) {
@@ -52,12 +83,16 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
 
     const signIn = async (email: string, password: string) => {
         try {
-            await account.createEmailPasswordSession(email, password);
-            
-            // Lấy user info
-            const currentUser = await account.get();
-            setUser(currentUser);
-            
+            const { data: { user: signInUser }, error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+
+            if (error) {
+                return error.message;
+            }
+
+            setUser(signInUser);
             return null;
         } catch (error) {
             if (error instanceof Error) {
@@ -69,7 +104,7 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
 
     const signOut = async () => {
         try {
-            await account.deleteSession("current");
+            await supabase.auth.signOut();
             setUser(null);
         } catch(error) {
             console.log(error)

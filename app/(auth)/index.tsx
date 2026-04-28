@@ -14,10 +14,14 @@ export default function AuthScreen(){
     
     const router = useRouter();
     const theme = useTheme()    
-    
+    const [loading, setLoading] = useState(false);
+
     const {signIn, signUp} = useAuth();
 
     const handleAuth = async () => {
+        setLoading(true);
+        setError(null);
+
         if (isSignUp) {
             // Signup validation
             if (!fullName || !email || !password || !confirmPassword) {
@@ -37,6 +41,8 @@ export default function AuthScreen(){
                 setError(signUpError);
                 return;
             }
+
+            setError("Check your email to confirm your account");
         } else {
             // Login validation
             if (!email || !password) {
@@ -122,8 +128,9 @@ export default function AuthScreen(){
                     mode="contained" 
                     style={styles.button}
                     onPress={handleAuth}
+                    disabled={loading}
                 >
-                        {isSignUp ? "Sign Up" : "Sign In"}
+                        {loading ? "Loading..." : isSignUp ? "Sign Up" : "Sign In"}
                 </Button>
                 <Button 
                     mode="text" 
