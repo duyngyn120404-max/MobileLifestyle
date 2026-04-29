@@ -1,579 +1,1214 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Dimensions, ImageBackground } from "react-native";
-import { Card } from "react-native-paper";
 import { useAuth } from "@/src/contexts/auth-context";
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "expo-router";
+import { homeHealthService } from "@/src/services/home-health.service";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { DISEASE_LIST, HEALTH_STATS, HEALTH_WARNINGS } from "@/src/constants/diseases";
-import type { Disease } from "@/src/types";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert,
+  Animated,
+  Easing,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  View,
+} from "react-native";
+import {
+  Button,
+  Card,
+  Chip,
+  HelperText,
+  Snackbar,
+  Text,
+  TextInput,
+} from "react-native-paper";
+
+const MEDICAL_COLORS = {
+  background: "#F4F8F8",
+  surface: "#FCFEFE",
+  surfaceSoft: "#EEF6F6",
+  surfaceSoft2: "#E7F1F2",
+  primary: "#0E7490",
+  primaryDark: "#0B5F73",
+  text: "#16323A",
+  textMuted: "#5B737B",
+  border: "#D8E7E8",
+  success: "#1F9D73",
+  warning: "#E9A23B",
+  danger: "#C75656",
+};
+
+const riskOptions = [
+  { key: "diabetes", label: "Đái tháo đường" },
+  { key: "smoking", label: "Hút thuốc lá" },
+  { key: "overweight", label: "Thừa cân hoặc béo phì" },
+  { key: "heartRateOver80", label: "Nhịp tim trên 80 lần/phút" },
+  { key: "highLDLOrTriglyceride", label: "Mỡ máu cao" },
+  { key: "familyHistoryOfHypertension", label: "Gia đình có THA" },
+];
+
+const hmodOptions = [
+  { key: "leftVentricularHypertrophy", label: "Phì đại thất trái" },
+  { key: "brainDamage", label: "Tổn thương não" },
+  { key: "heartDamage", label: "Tổn thương tim" },
+  { key: "kidneyDamage", label: "Tổn thương thận" },
+];
+
+const cvdOptions = [
+  { key: "coronaryArteryDisease", label: "Bệnh động mạch vành" },
+  { key: "heartFailure", label: "Suy tim" },
+  { key: "stroke", label: "Đột quỵ" },
+  { key: "atrialFibrillation", label: "Rung nhĩ" },
+];
+
+const symptomOptions = [
+  "Đau đầu",
+  "Chóng mặt",
+  "Mệt mỏi",
+  "Hồi hộp",
+  "Khó thở",
+  "Đau ngực",
+];
+
+const medicationOptions = [
+  "Amlodipine",
+  "Losartan",
+  "Valsartan",
+  "Bisoprolol",
+  "Perindopril",
+];
+
+const stages = [
+  {
+    key: "measurement",
+    title: "Đo huyết áp",
+    subtitle: "Nhập chỉ số đo chính của lần đo hiện tại",
+    icon: "heart-pulse",
+  },
+  {
+    key: "context",
+    title: "Bối cảnh đo",
+    subtitle: "Nguồn đo, thời điểm, tư thế và thiết bị",
+    icon: "stethoscope",
+  },
+  {
+    key: "clinical",
+    title: "Hồ sơ nguy cơ",
+    subtitle: "Nguy cơ, tổn thương cơ quan đích, bệnh liên quan",
+    icon: "head-heart",
+  },
+  {
+    key: "status",
+    title: "Triệu chứng & thuốc",
+    subtitle: "Biểu hiện hiện tại và thuốc đang sử dụng",
+    icon: "pill-multiple",
+  },
+] as const;
+
+type StageKey = (typeof stages)[number]["key"];
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const router = useRouter();
-  const [selectedDisease, setSelectedDisease] = useState<Disease | null>(null);
-  const [showHealthStatus, setShowHealthStatus] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const fabScaleAnim = useRef(new Animated.Value(1)).current;
+
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.user_metadata?.name as string | undefined) ||
+    "bạn";
+
+  const [currentStage, setCurrentStage] = useState<StageKey>("measurement");
+
+  const [systolic, setSystolic] = useState("");
+  const [diastolic, setDiastolic] = useState("");
+  const [bpSource, setBpSource] = useState<"HBPM" | "OBPM" | "ABPM">("HBPM");
+  const [dayPeriod, setDayPeriod] = useState<
+    "morning" | "evening" | "day" | "night"
+  >("morning");
+  const [position, setPosition] = useState<"sitting" | "standing" | "lying">(
+    "sitting",
+  );
+  const [restedMinutes, setRestedMinutes] = useState("");
+  const [deviceType, setDeviceType] = useState<"upper_arm" | "wrist">(
+    "upper_arm",
+  );
+  const [deviceValidated, setDeviceValidated] = useState(true);
+  const [measuredAt, setMeasuredAt] = useState("");
+
+  const [riskFactors, setRiskFactors] = useState<string[]>([]);
+  const [hmodItems, setHmodItems] = useState<string[]>([]);
+  const [cardiovascularDiseases, setCardiovascularDiseases] = useState<
+    string[]
+  >([]);
+  const [symptoms, setSymptoms] = useState<string[]>([]);
+  const [medications, setMedications] = useState<string[]>([]);
+
+  const [customSymptom, setCustomSymptom] = useState("");
+  const [customMedication, setCustomMedication] = useState("");
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [snackVisible, setSnackVisible] = useState(false);
+  const [snackMessage, setSnackMessage] = useState("");
+  const [snackError, setSnackError] = useState(false);
+
+  const stageAnim = useRef(new Animated.Value(0)).current;
+  const heroAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
+    Animated.timing(heroAnim, {
+      toValue: 1,
+      duration: 700,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [heroAnim]);
 
-  const getGreetingIcon = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "white-balance-sunny"; // Morning sun
-    if (hour < 17) return "weather-partly-cloudy"; // Afternoon
-    return "moon-waning-crescent"; // Evening moon
+  useEffect(() => {
+    stageAnim.setValue(0);
+    Animated.timing(stageAnim, {
+      toValue: 1,
+      duration: 360,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [currentStage, stageAnim]);
+
+  const stageIndex = stages.findIndex((item) => item.key === currentStage);
+  const progress = ((stageIndex + 1) / stages.length) * 100;
+
+  const measurementDone = Boolean(systolic && diastolic);
+  const contextDone = Boolean(bpSource && dayPeriod && position && deviceType);
+  const clinicalDone =
+    riskFactors.length > 0 ||
+    hmodItems.length > 0 ||
+    cardiovascularDiseases.length > 0;
+  const statusDone = symptoms.length > 0 || medications.length > 0;
+
+  const stageCompletionMap: Record<StageKey, boolean> = {
+    measurement: measurementDone,
+    context: contextDone,
+    clinical: clinicalDone,
+    status: statusDone,
   };
 
-  const getGreetingBackground = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return require("@/assets/images/morning.png");
-    if (hour < 17) return require("@/assets/images/afternoon.png");
-    return require("@/assets/images/evening.png");
+  const summaryText = useMemo(() => {
+    const selectedCount =
+      riskFactors.length +
+      hmodItems.length +
+      cardiovascularDiseases.length +
+      symptoms.length +
+      medications.length;
+
+    if (!systolic || !diastolic) {
+      return "Hãy bắt đầu bằng việc nhập chỉ số huyết áp để hệ thống có cơ sở lưu hồ sơ sức khỏe.";
+    }
+
+    if (selectedCount === 0) {
+      return `Bạn đã nhập ${systolic}/${diastolic} mmHg. Có thể bổ sung thêm bối cảnh lâm sàng để dữ liệu hữu ích hơn về sau.`;
+    }
+
+    return `Bạn đã hoàn thiện hồ sơ khá đầy đủ cho lần đo ${systolic}/${diastolic} mmHg với ${selectedCount} thông tin bổ sung.`;
+  }, [
+    systolic,
+    diastolic,
+    riskFactors.length,
+    hmodItems.length,
+    cardiovascularDiseases.length,
+    symptoms.length,
+    medications.length,
+  ]);
+
+  const showMessage = (message: string, isError = false) => {
+    setSnackMessage(message);
+    setSnackError(isError);
+    setSnackVisible(true);
   };
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Chào buổi sáng";
-    if (hour < 17) return "Chào buổi chiều";
-    return "Chào buổi tối";
+  const toggleItem = (
+    value: string,
+    values: string[],
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+  ) => {
+    setter((prev) =>
+      prev.includes(value)
+        ? prev.filter((item) => item !== value)
+        : [...prev, value],
+    );
   };
 
-  const getGreetingColor = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "#FFD700"; // Gold for morning
-    if (hour < 17) return "#FF8C00"; // Dark orange for afternoon
-    return "#9C27B0"; // Purple for evening
+  const addCustomItem = (
+    value: string,
+    setter: React.Dispatch<React.SetStateAction<string[]>>,
+    reset: () => void,
+  ) => {
+    const normalized = value.trim();
+    if (!normalized) return;
+
+    setter((prev) =>
+      prev.includes(normalized) ? prev : [...prev, normalized],
+    );
+    reset();
   };
 
-  const getTimeString = () => {
-    return new Date().toLocaleTimeString("vi-VN", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const goNext = () => {
+    if (stageIndex < stages.length - 1) {
+      setCurrentStage(stages[stageIndex + 1].key);
+    }
   };
 
-  const capitalizeName = (name: string) => {
-    if (!name) return "User";
-    return name
-      .split(" ")
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(" ");
+  const goBack = () => {
+    if (stageIndex > 0) {
+      setCurrentStage(stages[stageIndex - 1].key);
+    }
   };
 
-  const handleFABPress = () => {
-    Animated.sequence([
-      Animated.timing(fabScaleAnim, {
-        toValue: 0.8,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fabScaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    setShowHealthStatus(true);
+  const handleSubmit = async () => {
+    if (!user?.id) {
+      showMessage("Vui lòng đăng nhập trước khi lưu dữ liệu", true);
+      return;
+    }
+
+    if (!systolic || !diastolic) {
+      showMessage("Vui lòng nhập đầy đủ tâm thu và tâm trương", true);
+      setCurrentStage("measurement");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      await homeHealthService.submitSimpleForm({
+        userId: user.id,
+        systolic,
+        diastolic,
+        bpSource,
+        dayPeriod,
+        position,
+        restedMinutes,
+        deviceType,
+        deviceValidated,
+        measuredAt,
+        riskFactors,
+        hmodItems,
+        cardiovascularDiseases,
+        symptoms,
+        medications,
+        source: "user",
+      });
+
+      showMessage("Đã lưu thành công dữ liệu sức khỏe");
+      Alert.alert("Thành công", "Dữ liệu đã được lưu thành công.");
+    } catch (error) {
+      console.error("SUBMIT_SIMPLE_HOME_HEALTH_ERROR", error);
+      const message =
+        error instanceof Error ? error.message : "Không thể lưu dữ liệu";
+      showMessage(message, true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDiseaseSelect = (disease: Disease) => {
-    setSelectedDisease(disease);
-    router.push({
-      pathname: "/(disease)/input",
-      params: { diseaseId: disease.id, diseaseName: disease.name },
-    });
+  const renderStageContent = () => {
+    switch (currentStage) {
+      case "measurement":
+        return (
+          <Card style={styles.stageCard}>
+            <Card.Content>
+              <SectionHeading
+                title="Chỉ số huyết áp"
+                subtitle="Nhập hai chỉ số cốt lõi của lần đo hiện tại."
+              />
+
+              <View style={styles.bpRow}>
+                <View style={styles.bpField}>
+                  <Text style={styles.fieldLabel}>Tâm thu</Text>
+                  <TextInput
+                    value={systolic}
+                    onChangeText={setSystolic}
+                    keyboardType="numeric"
+                    mode="outlined"
+                    placeholder="Ví dụ 128"
+                    style={styles.textInput}
+                    outlineStyle={styles.inputOutline}
+                    right={<TextInput.Affix text="mmHg" />}
+                  />
+                </View>
+
+                <View style={styles.bpField}>
+                  <Text style={styles.fieldLabel}>Tâm trương</Text>
+                  <TextInput
+                    value={diastolic}
+                    onChangeText={setDiastolic}
+                    keyboardType="numeric"
+                    mode="outlined"
+                    placeholder="Ví dụ 82"
+                    style={styles.textInput}
+                    outlineStyle={styles.inputOutline}
+                    right={<TextInput.Affix text="mmHg" />}
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.fieldLabel}>Thời gian đo cụ thể</Text>
+              <TextInput
+                value={measuredAt}
+                onChangeText={setMeasuredAt}
+                mode="outlined"
+                placeholder="2026-04-29 11:30"
+                style={styles.textInput}
+                outlineStyle={styles.inputOutline}
+              />
+              <HelperText type="info" style={styles.helperText}>
+                Bạn có thể để trống nếu muốn dùng thời điểm lưu hiện tại.
+              </HelperText>
+            </Card.Content>
+          </Card>
+        );
+
+      case "context":
+        return (
+          <Card style={styles.stageCard}>
+            <Card.Content>
+              <SectionHeading
+                title="Bối cảnh của lần đo"
+                subtitle="Thông tin này giúp giải thích kết quả chính xác hơn."
+              />
+
+              <Text style={styles.groupLabel}>Nguồn đo</Text>
+              <View style={styles.choiceWrap}>
+                {["HBPM", "OBPM", "ABPM"].map((item) => (
+                  <SelectChip
+                    key={item}
+                    label={item}
+                    selected={bpSource === item}
+                    onPress={() =>
+                      setBpSource(item as "HBPM" | "OBPM" | "ABPM")
+                    }
+                  />
+                ))}
+              </View>
+
+              <Text style={styles.groupLabel}>Thời điểm đo</Text>
+              <View style={styles.choiceWrap}>
+                {[
+                  { label: "Sáng", value: "morning" },
+                  { label: "Tối", value: "evening" },
+                  { label: "Ban ngày", value: "day" },
+                  { label: "Ban đêm", value: "night" },
+                ].map((item) => (
+                  <SelectChip
+                    key={item.value}
+                    label={item.label}
+                    selected={dayPeriod === item.value}
+                    onPress={() =>
+                      setDayPeriod(
+                        item.value as "morning" | "evening" | "day" | "night",
+                      )
+                    }
+                  />
+                ))}
+              </View>
+
+              <Text style={styles.groupLabel}>Tư thế đo</Text>
+              <View style={styles.choiceWrap}>
+                {[
+                  { label: "Ngồi", value: "sitting" },
+                  { label: "Đứng", value: "standing" },
+                  { label: "Nằm", value: "lying" },
+                ].map((item) => (
+                  <SelectChip
+                    key={item.value}
+                    label={item.label}
+                    selected={position === item.value}
+                    onPress={() =>
+                      setPosition(
+                        item.value as "sitting" | "standing" | "lying",
+                      )
+                    }
+                  />
+                ))}
+              </View>
+
+              <Text style={styles.groupLabel}>Loại máy</Text>
+              <View style={styles.choiceWrap}>
+                {[
+                  { label: "Bắp tay", value: "upper_arm" },
+                  { label: "Cổ tay", value: "wrist" },
+                ].map((item) => (
+                  <SelectChip
+                    key={item.value}
+                    label={item.label}
+                    selected={deviceType === item.value}
+                    onPress={() =>
+                      setDeviceType(item.value as "upper_arm" | "wrist")
+                    }
+                  />
+                ))}
+              </View>
+
+              <Text style={styles.fieldLabel}>Số phút nghỉ trước khi đo</Text>
+              <TextInput
+                value={restedMinutes}
+                onChangeText={setRestedMinutes}
+                keyboardType="numeric"
+                mode="outlined"
+                placeholder="Ví dụ 5"
+                style={styles.textInput}
+                outlineStyle={styles.inputOutline}
+              />
+
+              <View style={styles.switchRow}>
+                <View style={styles.switchTextWrap}>
+                  <Text style={styles.switchTitle}>Máy đã được kiểm định</Text>
+                  <Text style={styles.switchSubtitle}>
+                    Nên bật nếu đây là thiết bị đáng tin cậy bạn thường dùng.
+                  </Text>
+                </View>
+                <Switch
+                  value={deviceValidated}
+                  onValueChange={setDeviceValidated}
+                  trackColor={{
+                    false: "#CFD9DA",
+                    true: "#96DBD0",
+                  }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
+            </Card.Content>
+          </Card>
+        );
+
+      case "clinical":
+        return (
+          <View style={styles.stageStack}>
+            <Card style={styles.stageCard}>
+              <Card.Content>
+                <SectionHeading
+                  title="Yếu tố nguy cơ"
+                  subtitle="Các yếu tố này giúp đặt kết quả đo vào bối cảnh nguy cơ nền."
+                />
+                <MultiSelectSection
+                  title="Nguy cơ hiện có"
+                  options={riskOptions}
+                  values={riskFactors}
+                  onToggle={(key) =>
+                    toggleItem(key, riskFactors, setRiskFactors)
+                  }
+                />
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.stageCard}>
+              <Card.Content>
+                <SectionHeading
+                  title="Tổn thương cơ quan đích"
+                  subtitle="Các tổn thương liên quan làm hồ sơ lâm sàng đầy đủ hơn."
+                />
+                <MultiSelectSection
+                  title="Các tổn thương đã biết"
+                  options={hmodOptions}
+                  values={hmodItems}
+                  onToggle={(key) => toggleItem(key, hmodItems, setHmodItems)}
+                />
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.stageCard}>
+              <Card.Content>
+                <SectionHeading
+                  title="Bệnh tim mạch liên quan"
+                  subtitle="Bệnh sử nền sẽ giúp ích cho việc theo dõi sau này."
+                />
+                <MultiSelectSection
+                  title="Bệnh sử tim mạch"
+                  options={cvdOptions}
+                  values={cardiovascularDiseases}
+                  onToggle={(key) =>
+                    toggleItem(
+                      key,
+                      cardiovascularDiseases,
+                      setCardiovascularDiseases,
+                    )
+                  }
+                />
+              </Card.Content>
+            </Card>
+          </View>
+        );
+
+      case "status":
+        return (
+          <View style={styles.stageStack}>
+            <Card style={styles.stageCard}>
+              <Card.Content>
+                <SectionHeading
+                  title="Triệu chứng hiện tại"
+                  subtitle="Chọn các biểu hiện đang có để bản ghi hữu ích hơn."
+                />
+
+                <View style={styles.choiceWrap}>
+                  {symptomOptions.map((item) => (
+                    <SelectChip
+                      key={item}
+                      label={item}
+                      selected={symptoms.includes(item)}
+                      onPress={() => toggleItem(item, symptoms, setSymptoms)}
+                    />
+                  ))}
+                </View>
+
+                <View style={styles.inlineInputRow}>
+                  <TextInput
+                    value={customSymptom}
+                    onChangeText={setCustomSymptom}
+                    mode="outlined"
+                    placeholder="Thêm triệu chứng khác"
+                    style={[styles.textInput, styles.inlineInput]}
+                    outlineStyle={styles.inputOutline}
+                  />
+                  <Button
+                    mode="contained-tonal"
+                    onPress={() =>
+                      addCustomItem(customSymptom, setSymptoms, () =>
+                        setCustomSymptom(""),
+                      )
+                    }
+                    style={styles.addButton}
+                  >
+                    Thêm
+                  </Button>
+                </View>
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.stageCard}>
+              <Card.Content>
+                <SectionHeading
+                  title="Thuốc đang dùng"
+                  subtitle="Ghi nhận thuốc giúp nhìn kết quả trong bối cảnh điều trị."
+                />
+
+                <View style={styles.choiceWrap}>
+                  {medicationOptions.map((item) => (
+                    <SelectChip
+                      key={item}
+                      label={item}
+                      selected={medications.includes(item)}
+                      onPress={() =>
+                        toggleItem(item, medications, setMedications)
+                      }
+                    />
+                  ))}
+                </View>
+
+                <View style={styles.inlineInputRow}>
+                  <TextInput
+                    value={customMedication}
+                    onChangeText={setCustomMedication}
+                    mode="outlined"
+                    placeholder="Thêm thuốc khác"
+                    style={[styles.textInput, styles.inlineInput]}
+                    outlineStyle={styles.inputOutline}
+                  />
+                  <Button
+                    mode="contained-tonal"
+                    onPress={() =>
+                      addCustomItem(customMedication, setMedications, () =>
+                        setCustomMedication(""),
+                      )
+                    }
+                    style={styles.addButton}
+                  >
+                    Thêm
+                  </Button>
+                </View>
+              </Card.Content>
+            </Card>
+
+            <Card style={styles.summaryCard}>
+              <Card.Content>
+                <Text style={styles.summaryEyebrow}>
+                  Tóm tắt hồ sơ lần nhập
+                </Text>
+                <Text style={styles.summaryTitle}>Bạn đã gần hoàn tất</Text>
+                <Text style={styles.summaryText}>{summaryText}</Text>
+
+                <View style={styles.summaryChips}>
+                  <Chip style={styles.summaryChip}>
+                    Nguy cơ {riskFactors.length}
+                  </Chip>
+                  <Chip style={styles.summaryChip}>
+                    HMOD {hmodItems.length}
+                  </Chip>
+                  <Chip style={styles.summaryChip}>
+                    CVD {cardiovascularDiseases.length}
+                  </Chip>
+                  <Chip style={styles.summaryChip}>
+                    Triệu chứng {symptoms.length}
+                  </Chip>
+                  <Chip style={styles.summaryChip}>
+                    Thuốc {medications.length}
+                  </Chip>
+                </View>
+              </Card.Content>
+            </Card>
+          </View>
+        );
+
+      default:
+        return null;
+    }
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-      {/* Animated Greeting Header */}
-      <Animated.View
-        style={[
-          styles.greetingSection,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          },
-        ]}
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
       >
-        <ImageBackground
-          source={getGreetingBackground()}
-          style={styles.greetingBackground}
-          imageStyle={styles.greetingBackgroundImage}
+        <Animated.View
+          style={[
+            styles.heroCard,
+            {
+              opacity: heroAnim,
+              transform: [
+                {
+                  translateY: heroAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [18, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
         >
-          <View style={styles.greetingOverlay}>
-            <View style={styles.greetingContainer}>
-              <Text style={styles.userName}>{capitalizeName(user?.name || "User")}</Text>
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroIconWrap}>
+              <MaterialCommunityIcons
+                name={stages[stageIndex].icon}
+                size={28}
+                color={MEDICAL_COLORS.primary}
+              />
             </View>
-          </View>
-        </ImageBackground>
-      </Animated.View>
 
-      {/* Latest Alert/Notification Banner */}
-      <View style={[styles.alertBannerSection, { marginTop: 16 }]}>
-        <Card style={styles.alertBanner}>
+            <Chip
+              style={styles.progressChip}
+              textStyle={styles.progressChipText}
+            >
+              Bước {stageIndex + 1}/{stages.length}
+            </Chip>
+          </View>
+
+          <Text style={styles.heroTitle}>Nhập hồ sơ sức khỏe</Text>
+          <Text style={styles.heroSubtitle}>
+            Xin chào {displayName}, hãy đi từng bước để việc nhập liệu ngắn gọn,
+            rõ ràng và dễ chịu hơn.
+          </Text>
+
+          <View style={styles.progressTrack}>
+            <Animated.View
+              style={[
+                styles.progressBar,
+                {
+                  width: `${progress}%`,
+                },
+              ]}
+            />
+          </View>
+        </Animated.View>
+
+        <Card style={styles.stageRailCard}>
           <Card.Content>
-            {HEALTH_WARNINGS.length > 0 ? (
-              <>
-                <View style={styles.alertHeader}>
-                  <MaterialCommunityIcons
-                    name={HEALTH_WARNINGS[0].icon as any}
-                    size={24}
-                    color={HEALTH_WARNINGS[0].color}
-                  />
-                  <Text style={[styles.alertTitle, { color: HEALTH_WARNINGS[0].color }]}>
-                    {HEALTH_WARNINGS[0].title}
-                  </Text>
-                </View>
-                <Text style={styles.alertTimestamp}>
-                  {new Date().toLocaleDateString("vi-VN", {
-                    day: "2-digit",
-                    month: "2-digit",
-                    year: "numeric",
-                  })} {new Date().toLocaleTimeString("vi-VN", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </Text>
-                <Text style={styles.alertDescription}>
-                  {HEALTH_WARNINGS[0].description}
-                </Text>
-              </>
-            ) : (
-              <View style={styles.noAlertContainer}>
-                <MaterialCommunityIcons
-                  name="check-circle"
-                  size={24}
-                  color="#34C759"
-                />
-                <Text style={styles.noAlertText}>Không có ghi chú quan trọng nào</Text>
-              </View>
-            )}
+            <Text style={styles.stageRailTitle}>Chọn giai đoạn</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.stageRailContent}
+            >
+              {stages.map((stage, index) => {
+                const active = stage.key === currentStage;
+                const completed = stageCompletionMap[stage.key];
+
+                return (
+                  <Pressable
+                    key={stage.key}
+                    onPress={() => setCurrentStage(stage.key)}
+                    style={[styles.stagePill, active && styles.stagePillActive]}
+                  >
+                    <View
+                      style={[
+                        styles.stagePillIconWrap,
+                        active && styles.stagePillIconWrapActive,
+                      ]}
+                    >
+                      <MaterialCommunityIcons
+                        name={completed ? "check-circle" : stage.icon}
+                        size={18}
+                        color={
+                          active
+                            ? MEDICAL_COLORS.primaryDark
+                            : completed
+                              ? MEDICAL_COLORS.success
+                              : MEDICAL_COLORS.textMuted
+                        }
+                      />
+                    </View>
+
+                    <View>
+                      <Text
+                        style={[
+                          styles.stagePillTitle,
+                          active && styles.stagePillTitleActive,
+                        ]}
+                      >
+                        {index + 1}. {stage.title}
+                      </Text>
+                      <Text style={styles.stagePillSubtitle}>
+                        {stage.subtitle}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           </Card.Content>
         </Card>
-      </View>
 
-      {/* Quick Action Section */}
-      <View style={styles.quickActionSection}>
-        <Text style={styles.sectionTitle}>Theo dõi sức khỏe hôm nay</Text>
-        <Text style={styles.sectionSubtitle}>Chọn loại chỉ số để nhập dữ liệu</Text>
-      </View>
+        <Animated.View
+          style={{
+            opacity: stageAnim,
+            transform: [
+              {
+                translateY: stageAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [24, 0],
+                }),
+              },
+              {
+                scale: stageAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.985, 1],
+                }),
+              },
+            ],
+          }}
+        >
+          {renderStageContent()}
+        </Animated.View>
 
-      {/* Disease Grid */}
-      <View style={styles.diseaseGrid}>
-        {DISEASE_LIST.map((disease) => (
-          <TouchableOpacity
-            key={disease.id}
-            style={styles.diseaseCard}
-            onPress={() => handleDiseaseSelect(disease)}
+        <View style={styles.footerActions}>
+          <Button
+            mode="text"
+            onPress={goBack}
+            disabled={stageIndex === 0}
+            textColor={MEDICAL_COLORS.textMuted}
+            style={styles.secondaryButton}
           >
-            <Card style={[styles.card, { borderLeftColor: disease.color, borderLeftWidth: 4 }]}>
-              <Card.Content style={styles.cardContent}>
-                <MaterialCommunityIcons
-                  name={disease.icon as any}
-                  size={40}
-                  color={disease.color}
-                  style={styles.cardIcon}
-                />
-                <Text style={styles.diseaseName}>{disease.name}</Text>
-                <Text style={styles.diseaseDescription}>{disease.description}</Text>
-              </Card.Content>
-            </Card>
-          </TouchableOpacity>
+            Quay lại
+          </Button>
+
+          {stageIndex < stages.length - 1 ? (
+            <Button
+              mode="contained"
+              onPress={goNext}
+              style={styles.primaryButton}
+              contentStyle={styles.primaryButtonContent}
+              buttonColor={MEDICAL_COLORS.primary}
+            >
+              Tiếp tục
+            </Button>
+          ) : (
+            <Button
+              mode="contained"
+              onPress={handleSubmit}
+              loading={isSubmitting}
+              disabled={isSubmitting}
+              style={styles.primaryButton}
+              contentStyle={styles.primaryButtonContent}
+              buttonColor={MEDICAL_COLORS.primary}
+            >
+              Lưu dữ liệu
+            </Button>
+          )}
+        </View>
+      </ScrollView>
+
+      <Snackbar
+        visible={snackVisible}
+        onDismiss={() => setSnackVisible(false)}
+        duration={snackError ? 3500 : 2500}
+        style={{
+          backgroundColor: snackError
+            ? MEDICAL_COLORS.danger
+            : MEDICAL_COLORS.success,
+        }}
+      >
+        {snackMessage}
+      </Snackbar>
+    </SafeAreaView>
+  );
+}
+
+function SectionHeading({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle: string;
+}) {
+  return (
+    <View style={styles.sectionHeadingWrap}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+    </View>
+  );
+}
+
+function MultiSelectSection({
+  title,
+  options,
+  values,
+  onToggle,
+}: {
+  title: string;
+  options: Array<{ key: string; label: string }>;
+  values: string[];
+  onToggle: (key: string) => void;
+}) {
+  return (
+    <View>
+      <Text style={styles.groupLabel}>{title}</Text>
+      <View style={styles.choiceWrap}>
+        {options.map((item) => (
+          <SelectChip
+            key={item.key}
+            label={item.label}
+            selected={values.includes(item.key)}
+            onPress={() => onToggle(item.key)}
+          />
         ))}
       </View>
+    </View>
+  );
+}
 
-      {/* Footer - University Info */}
-      <View style={styles.footerSection}>
-        <MaterialCommunityIcons name="school" size={24} color="#007AFF" />
-        <Text style={styles.footerText}>Ứng dụng được phát triển bởi</Text>
-        <Text style={styles.universityName}>Trường Đại học Quốc tế Sài Gòn</Text>
-      </View>
-    </ScrollView>
-
-    {/* Floating Action Button */}
-    <Animated.View
-      style={[
-        styles.fabContainer,
-        {
-          transform: [{ scale: fabScaleAnim }],
-        },
-      ]}
+function SelectChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[styles.selectChip, selected && styles.selectChipActive]}
     >
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleFABPress}
-        activeOpacity={0.7}
+      <Text
+        style={[styles.selectChipText, selected && styles.selectChipTextActive]}
       >
-        <MaterialCommunityIcons name="heart-plus" size={28} color="#fff" />
-      </TouchableOpacity>
-    </Animated.View>
-
-    {/* Health Status Modal */}
-    {showHealthStatus && (
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Tình hình sức khỏe</Text>
-            <TouchableOpacity onPress={() => setShowHealthStatus(false)}>
-              <MaterialCommunityIcons name="close" size={24} color="#333" />
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.warningsContainer} showsVerticalScrollIndicator={false}>
-            {HEALTH_WARNINGS.map((warning: any, index: number) => (
-              <View key={index} style={styles.warningCard}>
-                <View style={[styles.warningIcon, { backgroundColor: warning.color + "20" }]}>
-                  <MaterialCommunityIcons
-                    name={warning.icon as any}
-                    size={24}
-                    color={warning.color}
-                  />
-                </View>
-                <View style={styles.warningContent}>
-                  <Text style={styles.warningTitle}>{warning.title}</Text>
-                  <Text style={styles.warningDescription}>{warning.description}</Text>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setShowHealthStatus(false)}
-          >
-            <Text style={styles.closeButtonText}>Đóng</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    )}
-  </View>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: MEDICAL_COLORS.background,
+  },
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: MEDICAL_COLORS.background,
   },
-  scrollContainer: {
-    flex: 1,
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 36,
   },
-  greetingSection: {
-    backgroundColor: "transparent",
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 12,
+  heroCard: {
+    backgroundColor: MEDICAL_COLORS.surface,
+    borderRadius: 28,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: MEDICAL_COLORS.border,
   },
-  greetingBackground: {
-    paddingHorizontal: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
-    height: 150,
-    borderRadius: 16,
+  heroTopRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  heroIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E3F2F3",
+  },
+  progressChip: {
+    backgroundColor: "#E8F6F4",
+  },
+  progressChipText: {
+    color: MEDICAL_COLORS.primaryDark,
+    fontWeight: "800",
+    fontSize: 13,
+  },
+  heroTitle: {
+    fontSize: 30,
+    lineHeight: 38,
+    fontWeight: "900",
+    color: MEDICAL_COLORS.text,
+    marginBottom: 8,
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: MEDICAL_COLORS.textMuted,
+    marginBottom: 16,
+  },
+  progressTrack: {
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: "#E4EEEE",
     overflow: "hidden",
   },
-  greetingBackgroundImage: {
-    borderRadius: 16,
+  progressBar: {
+    height: "100%",
+    borderRadius: 999,
+    backgroundColor: MEDICAL_COLORS.primary,
   },
-  greetingOverlay: {
-    backgroundColor: "transparent",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+  stageRailCard: {
+    marginBottom: 16,
+    borderRadius: 22,
+    backgroundColor: MEDICAL_COLORS.surface,
+    borderWidth: 1,
+    borderColor: MEDICAL_COLORS.border,
   },
-  greetingContainer: {
-    flexDirection: "column",
-    justifyContent: "flex-start",
-    alignItems: "flex-start",
-    gap: 2,
-    paddingHorizontal: 0,
-  },
-  greeting: {
+  stageRailTitle: {
     fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 2,
-    color: "#fff",
+    fontWeight: "800",
+    color: MEDICAL_COLORS.text,
+    marginBottom: 12,
   },
-  timeDisplay: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#007AFF",
-    marginBottom: 8,
+  stageRailContent: {
+    gap: 10,
+    paddingRight: 8,
   },
-  userName: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#fff",
-    marginBottom: 0,
-  },
-  date: {
-    fontSize: 12,
-    color: "#666",
-    fontWeight: "400",
-    marginTop: 4,
-  },
-  dateTime: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#007AFF",
-    marginTop: 6,
-  },
-  statsContainer: {
+  stagePill: {
+    width: 240,
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: MEDICAL_COLORS.surfaceSoft,
+    borderWidth: 1,
+    borderColor: "#DCE9EA",
     flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 20,
     gap: 12,
+    alignItems: "flex-start",
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#fff",
+  stagePillActive: {
+    backgroundColor: "#DFF2F0",
+    borderColor: "#8FD9CD",
+  },
+  stagePillIconWrap: {
+    width: 36,
+    height: 36,
     borderRadius: 12,
-    padding: 12,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3.84,
-    elevation: 2,
-  },
-  statIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
     justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 8,
+    backgroundColor: "#F8FBFB",
   },
-  statValue: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 2,
+  stagePillIconWrapActive: {
+    backgroundColor: "#ECFBF8",
   },
-  statLabel: {
-    fontSize: 11,
-    color: "#999",
-    textAlign: "center",
+  stagePillTitle: {
+    fontSize: 14,
+    fontWeight: "800",
+    color: MEDICAL_COLORS.text,
+    marginBottom: 3,
   },
-  quickActionSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  stagePillTitleActive: {
+    color: MEDICAL_COLORS.primaryDark,
+  },
+  stagePillSubtitle: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: MEDICAL_COLORS.textMuted,
+    width: 165,
+  },
+  stageStack: {
+    gap: 14,
+  },
+  stageCard: {
+    marginBottom: 14,
+    borderRadius: 24,
+    backgroundColor: MEDICAL_COLORS.surface,
+    borderWidth: 1,
+    borderColor: MEDICAL_COLORS.border,
+    overflow: "hidden",
+  },
+  summaryCard: {
+    marginBottom: 14,
+    borderRadius: 24,
+    backgroundColor: "#EAF5F4",
+    borderWidth: 1,
+    borderColor: "#CFE7E4",
+    overflow: "hidden",
+  },
+  sectionHeadingWrap: {
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 4,
+    fontSize: 22,
+    fontWeight: "900",
+    color: MEDICAL_COLORS.text,
+    marginBottom: 6,
   },
   sectionSubtitle: {
-    fontSize: 13,
-    color: "#999",
-    marginBottom: 12,
+    fontSize: 14,
+    lineHeight: 22,
+    color: MEDICAL_COLORS.textMuted,
   },
-  diseaseGrid: {
-    paddingHorizontal: 16,
-    paddingBottom: 5,
+  bpRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 6,
   },
-  diseaseCard: {
-    marginBottom: 12,
+  bpField: {
+    flex: 1,
   },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-  },
-  cardContent: {
-    alignItems: "center",
-    paddingVertical: 16,
-  },
-  cardIcon: {
+  fieldLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: MEDICAL_COLORS.text,
     marginBottom: 8,
   },
-  diseaseName: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
+  textInput: {
+    backgroundColor: "#FFFFFF",
+    marginBottom: 10,
+  },
+  inputOutline: {
+    borderRadius: 16,
+    borderColor: "#D7E5E5",
+  },
+  helperText: {
+    color: MEDICAL_COLORS.textMuted,
+  },
+  groupLabel: {
+    marginTop: 6,
+    marginBottom: 10,
+    fontSize: 15,
+    fontWeight: "800",
+    color: MEDICAL_COLORS.text,
+  },
+  choiceWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 8,
+  },
+  selectChip: {
+    minHeight: 46,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    backgroundColor: "#EEF4F5",
+    borderWidth: 1,
+    borderColor: "#D9E8E8",
+    justifyContent: "center",
+  },
+  selectChipActive: {
+    backgroundColor: "#DDF3F0",
+    borderColor: "#82D4C8",
+  },
+  selectChipText: {
+    color: MEDICAL_COLORS.text,
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  selectChipTextActive: {
+    color: MEDICAL_COLORS.primaryDark,
+  },
+  switchRow: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  switchTextWrap: {
+    flex: 1,
+  },
+  switchTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    color: MEDICAL_COLORS.text,
     marginBottom: 4,
   },
-  diseaseDescription: {
-    fontSize: 12,
-    color: "#999",
-    textAlign: "center",
+  switchSubtitle: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: MEDICAL_COLORS.textMuted,
   },
-  fabContainer: {
-    position: "absolute",
-    bottom: 24,
-    right: 24,
-    zIndex: 100,
-  },
-  fab: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#007AFF",
-    justifyContent: "center",
+  inlineInputRow: {
+    flexDirection: "row",
     alignItems: "center",
-    shadowColor: "#007AFF",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    gap: 10,
+    marginTop: 8,
   },
-  modalOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-    zIndex: 101,
+  inlineInput: {
+    flex: 1,
+    marginBottom: 0,
   },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: "80%",
-    paddingBottom: 20,
+  addButton: {
+    borderRadius: 14,
   },
-  modalHeader: {
+  summaryEyebrow: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: MEDICAL_COLORS.primaryDark,
+    marginBottom: 8,
+  },
+  summaryTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: MEDICAL_COLORS.text,
+    marginBottom: 8,
+  },
+  summaryText: {
+    fontSize: 15,
+    lineHeight: 23,
+    color: MEDICAL_COLORS.textMuted,
+    marginBottom: 14,
+  },
+  summaryChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  summaryChip: {
+    backgroundColor: "#F7FBFB",
+  },
+  footerActions: {
+    marginTop: 4,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  warningsContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    maxHeight: 400,
-  },
-  warningCard: {
-    flexDirection: "row",
-    backgroundColor: "#fafafa",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    alignItems: "flex-start",
     gap: 12,
   },
-  warningIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 2,
-  },
-  warningContent: {
+  secondaryButton: {
     flex: 1,
+    borderRadius: 16,
   },
-  warningTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 4,
+  primaryButton: {
+    flex: 1.4,
+    borderRadius: 18,
+    backgroundColor: MEDICAL_COLORS.primary,
   },
-  warningDescription: {
-    fontSize: 12,
-    color: "#999",
-    lineHeight: 18,
-  },
-  alertBannerSection: {
-    marginHorizontal: 16,
-    marginBottom: 24,
-  },
-  alertBanner: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    borderLeftWidth: 4,
-  },
-  alertHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-    gap: 8,
-  },
-  alertTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    flex: 1,
-  },
-  alertTimestamp: {
-    fontSize: 12,
-    color: "#999",
-    marginTop: 6,
-    marginLeft: 32,
-    fontWeight: "400",
-  },
-  alertDescription: {
-    fontSize: 13,
-    color: "#666",
-    lineHeight: 18,
-    marginLeft: 32,
-    marginTop: 8,
-  },
-  noAlertContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  noAlertText: {
-    fontSize: 14,
-    color: "#34C759",
-    fontWeight: "500",
-  },
-  closeButton: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    paddingVertical: 12,
-    backgroundColor: "#007AFF",
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  closeButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  footerSection: {
-    alignItems: "center",
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#E8E8E8",
-    marginTop: 25,
-  },
-  footerText: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: 8,
-  },
-  universityName: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#007AFF",
-    marginTop: 4,
+  primaryButtonContent: {
+    height: 56,
   },
 });
