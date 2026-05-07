@@ -59,19 +59,6 @@ export function AuthProvider({children}: {children: React.ReactNode}) {
                 return "Failed to create user account";
             }
 
-            // Create user profile in users table using UUID from auth
-            const { error: profileError } = await supabase
-                .from('users')
-                .insert({
-                    id: newUser.id,
-                    full_name: fullName,
-                    email: email,
-                });
-
-            if (profileError) {
-                return profileError.message;
-            }
-
             setUser(newUser);
             return null;
         } catch (error) {
