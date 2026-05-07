@@ -12,6 +12,7 @@ function RouteGuard({children}: {children: React.ReactNode}) {
 
   useEffect(() => {
     const inAuthGroup = segments[0] === "(auth)"
+    console.log('[RouteGuard] user:', user?.id ?? null, 'isLoadingUser:', isLoadingUser, 'inAuthGroup:', inAuthGroup);
 
     // Nếu đang load, không làm gì
     if (isLoadingUser) {
@@ -21,9 +22,10 @@ function RouteGuard({children}: {children: React.ReactNode}) {
     // Nếu có user và đang ở auth, chuyển về home
     if (user && inAuthGroup) {
       router.replace("/(tabs)");
-    } 
+    }
     // Nếu không có user và không ở auth, chuyển về auth
     else if (!user && !inAuthGroup) {
+      console.log('[RouteGuard] no user, redirecting to /(auth)');
       router.replace("/(auth)");
     }
   }, [user, segments, isLoadingUser]);

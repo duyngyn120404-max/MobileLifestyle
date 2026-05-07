@@ -17,7 +17,7 @@ export const useChatController = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [intentMode, setIntentMode] = useState<IntentMode>('auto');
+  const [intentMode, setIntentMode] = useState<IntentMode>('data_collection');
   const recordingRef = useRef<Audio.Recording | null>(null);
 
   const loadSessions = useCallback(async () => {
@@ -50,7 +50,6 @@ export const useChatController = () => {
     setMessages(prev => [...prev, { id: botMessageId, type: 'bot', content: '', timestamp: new Date() }]);
 
     try {
-      // Create conversation on first message if none exists
       let convId = currentSessionId;
       if (!convId) {
         const conv = await chatService.createSession(sentContent.substring(0, 50));
@@ -64,23 +63,16 @@ export const useChatController = () => {
         }, ...prev]);
       }
 
-      const { botContent, ingestionResult } = await chatService.sendMessage(convId, sentContent, intentMode);
+      const { botContent, ingestionResult, needsClarification } = await chatService.sendMessage(convId, sentContent, intentMode);
 
-      console.log('[chat] ingestionResult:', JSON.stringify(ingestionResult));
-
-      let pendingConfirm: Message['pendingConfirm'];
-      if (ingestionResult?.requires_review) {
-        const built = chatService.buildReviewItems(ingestionResult);
-        pendingConfirm = {
-          reviewItems: built.reviewItems,
-          autoAcceptIds: built.autoAcceptIds,
-        };
-      }
+      const reviewItems = ingestionResult && !needsClarification
+        ? chatService.buildReviewItems(ingestionResult)
+        : undefined;
 
       setMessages(prev =>
         prev.map(msg =>
           msg.id === botMessageId
-            ? { ...msg, content: botContent, pendingConfirm }
+            ? { ...msg, content: botContent, reviewItems: reviewItems?.length ? reviewItems : undefined }
             : msg
         )
       );
@@ -95,18 +87,16 @@ export const useChatController = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [inputMessage, selectedImage, currentSessionId]);
+  }, [inputMessage, selectedImage, currentSessionId, intentMode]);
 
   const reviewRecord = useCallback(async (
     messageId: string,
     recordIndex: number,
     decision: 'accepted' | 'rejected'
   ) => {
-    // Read current state before any async ops to avoid stale closure
     const msg = messages.find(m => m.id === messageId);
     if (!msg?.reviewItems) return;
     const item = msg.reviewItems[recordIndex];
-    const autoAcceptIds = msg.autoAcceptIds ?? [];
 
     // Optimistically update UI
     setMessages(prev =>
@@ -123,16 +113,6 @@ export const useChatController = () => {
 
     try {
       await apiClient.reviewRecord(item.table, item.recordId, decision);
-
-      // Check if this was the last pending bp_record — if so, auto-accept clinical_facts
-      const othersDone = msg.reviewItems
-        .filter((_, i) => i !== recordIndex)
-        .every(r => r.decision !== null);
-      if (othersDone && autoAcceptIds.length > 0) {
-        await Promise.allSettled(
-          autoAcceptIds.map(a => apiClient.reviewRecord(a.table, a.recordId, 'accepted'))
-        );
-      }
     } catch (err) {
       console.error('Error reviewing record:', err);
       setMessages(prev =>
@@ -148,35 +128,6 @@ export const useChatController = () => {
       );
       Alert.alert('Lỗi', 'Không thể cập nhật trạng thái. Vui lòng thử lại.');
     }
-  }, [messages]);
-
-  // User taps "Lưu" → move pendingConfirm → reviewItems so review card appears
-  const confirmReview = useCallback((messageId: string) => {
-    setMessages(prev =>
-      prev.map(msg => {
-        if (msg.id !== messageId || !msg.pendingConfirm) return msg;
-        return {
-          ...msg,
-          pendingConfirm: undefined,
-          reviewItems: msg.pendingConfirm.reviewItems,
-          autoAcceptIds: msg.pendingConfirm.autoAcceptIds,
-        };
-      })
-    );
-  }, []);
-
-  // User taps "Không lưu" → reject all pending records silently
-  const cancelReview = useCallback(async (messageId: string) => {
-    const msg = messages.find(m => m.id === messageId);
-    if (!msg?.pendingConfirm) return;
-    const { reviewItems, autoAcceptIds } = msg.pendingConfirm;
-    setMessages(prev =>
-      prev.map(m => m.id === messageId ? { ...m, pendingConfirm: undefined } : m)
-    );
-    await Promise.allSettled([
-      ...reviewItems.map(r => apiClient.reviewRecord(r.table, r.recordId, 'rejected')),
-      ...autoAcceptIds.map(a => apiClient.reviewRecord(a.table, a.recordId, 'rejected')),
-    ]);
   }, [messages]);
 
   const selectSession = useCallback(async (sessionId: string) => {
@@ -285,8 +236,6 @@ export const useChatController = () => {
     selectSession,
     deleteSession,
     reviewRecord,
-    confirmReview,
-    cancelReview,
     startRecording,
     stopRecording,
     speakMessage,

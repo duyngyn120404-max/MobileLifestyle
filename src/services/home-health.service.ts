@@ -10,7 +10,7 @@ import type {
 } from '@/src/config/supabaseApi';
 
 export type BpSource = 'HBPM' | 'OBPM' | 'ABPM';
-export type DayPeriod = 'morning' | 'evening' | 'day' | 'night';
+export type DayPeriod = 'morning' | 'afternoon' | 'evening' | 'night';
 export type PositionType = 'sitting' | 'standing' | 'lying';
 export type DeviceType = 'upper_arm' | 'wrist';
 

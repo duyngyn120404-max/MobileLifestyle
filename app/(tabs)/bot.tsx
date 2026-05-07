@@ -4,12 +4,12 @@ import { useEffect } from "react";
 import { useAuth } from "@/src/contexts/auth-context";
 import { useChatController } from "@/src/controllers/useChatController";
 import { Message, ReviewRecord, IntentMode } from "@/src/types";
+
 import { audioService } from "@/src/services/audio.service";
 
 // ── Intent selector ────────────────────────────────────────────────────────
 
 const INTENT_OPTIONS: { value: IntentMode; label: string; icon: string }[] = [
-  { value: "auto",                label: "Tự động",    icon: "auto-fix" },
   { value: "personal_medical_qa", label: "Cá nhân",    icon: "account-heart" },
   { value: "general_medical_qa",  label: "Tổng quát",  icon: "stethoscope" },
   { value: "data_collection",     label: "Ghi nhận",   icon: "database-plus" },
@@ -63,54 +63,6 @@ const intentStyles = StyleSheet.create({
   chipTextActive: { color: "#fff" },
 });
 
-// ── Confirm card (ask before showing review) ──────────────────────────────
-
-function ConfirmCard({
-  messageId,
-  onConfirm,
-  onCancel,
-}: {
-  messageId: string;
-  onConfirm: (id: string) => void;
-  onCancel: (id: string) => void;
-}) {
-  return (
-    <View style={confirmStyles.card}>
-      <View style={confirmStyles.header}>
-        <MaterialCommunityIcons name="database-plus" size={16} color="#007AFF" />
-        <Text style={confirmStyles.title}>Bạn có muốn lưu thông tin này không?</Text>
-      </View>
-      <View style={confirmStyles.actions}>
-        <TouchableOpacity style={[confirmStyles.btn, confirmStyles.saveBtn]} onPress={() => onConfirm(messageId)}>
-          <MaterialCommunityIcons name="check" size={14} color="#fff" />
-          <Text style={confirmStyles.btnText}>Lưu lại</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[confirmStyles.btn, confirmStyles.skipBtn]} onPress={() => onCancel(messageId)}>
-          <MaterialCommunityIcons name="close" size={14} color="#666" />
-          <Text style={[confirmStyles.btnText, { color: "#666" }]}>Không lưu</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-const confirmStyles = StyleSheet.create({
-  card: {
-    marginTop: 8, marginHorizontal: 12, backgroundColor: "#F0F7FF",
-    borderRadius: 12, borderWidth: 1, borderColor: "#C5DFF8", padding: 12,
-  },
-  header: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
-  title: { fontSize: 13, fontWeight: "600", color: "#007AFF", flex: 1 },
-  actions: { flexDirection: "row", gap: 8 },
-  btn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 5, paddingVertical: 8, borderRadius: 8,
-  },
-  saveBtn: { backgroundColor: "#007AFF" },
-  skipBtn: { backgroundColor: "#f0f0f0", borderWidth: 1, borderColor: "#ddd" },
-  btnText: { fontSize: 13, color: "#fff", fontWeight: "600" },
-});
-
 // ── Review card ────────────────────────────────────────────────────────────
 
 function ReviewCard({
@@ -134,26 +86,26 @@ function ReviewCard({
       </View>
       {items.map((item, index) => {
         if (item.decision !== null) return null;
-        const label = item.table === "bp_records"
-          ? `Chỉ số huyết áp #${index + 1}`
-          : `Thông tin lâm sàng #${index + 1}`;
+        const label = item.label;
         return (
           <View key={item.recordId} style={reviewStyles.row}>
-            <Text style={reviewStyles.rowLabel} numberOfLines={1}>{label}</Text>
-            <TouchableOpacity
-              style={[reviewStyles.btn, reviewStyles.acceptBtn]}
-              onPress={() => onReview(messageId, index, "accepted")}
-            >
-              <MaterialCommunityIcons name="check" size={14} color="#fff" />
-              <Text style={reviewStyles.btnText}>Xác nhận</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[reviewStyles.btn, reviewStyles.rejectBtn]}
-              onPress={() => onReview(messageId, index, "rejected")}
-            >
-              <MaterialCommunityIcons name="close" size={14} color="#fff" />
-              <Text style={reviewStyles.btnText}>Bỏ qua</Text>
-            </TouchableOpacity>
+            <Text style={reviewStyles.rowLabel}>{label}</Text>
+            <View style={reviewStyles.btnGroup}>
+              <TouchableOpacity
+                style={[reviewStyles.btn, reviewStyles.acceptBtn]}
+                onPress={() => onReview(messageId, index, "accepted")}
+              >
+                <MaterialCommunityIcons name="check" size={14} color="#fff" />
+                <Text style={reviewStyles.btnText}>Xác nhận</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[reviewStyles.btn, reviewStyles.rejectBtn]}
+                onPress={() => onReview(messageId, index, "rejected")}
+              >
+                <MaterialCommunityIcons name="close" size={14} color="#fff" />
+                <Text style={reviewStyles.btnText}>Bỏ qua</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         );
       })}
@@ -168,8 +120,9 @@ const reviewStyles = StyleSheet.create({
   },
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
   cardTitle: { fontSize: 13, fontWeight: "600", color: "#007AFF" },
-  row: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
-  rowLabel: { flex: 1, fontSize: 13, color: "#333" },
+  row: { flexDirection: "column", gap: 6, marginBottom: 10 },
+  rowLabel: { fontSize: 13, color: "#333" },
+  btnGroup: { flexDirection: "row", gap: 8 },
   btn: {
     flexDirection: "row", alignItems: "center", gap: 4,
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
@@ -200,8 +153,6 @@ export default function BotScreen() {
     selectSession,
     deleteSession,
     reviewRecord,
-    confirmReview,
-    cancelReview,
     startRecording,
     stopRecording,
     speakMessage,
@@ -240,15 +191,7 @@ export default function BotScreen() {
             </View>
           </View>
 
-          {!isUser && item.pendingConfirm && (
-            <ConfirmCard
-              messageId={item.id}
-              onConfirm={confirmReview}
-              onCancel={cancelReview}
-            />
-          )}
-
-          {!isUser && !item.pendingConfirm && item.reviewItems && item.reviewItems.length > 0 && (
+          {!isUser && item.reviewItems && item.reviewItems.length > 0 && (
             <ReviewCard
               messageId={item.id}
               items={item.reviewItems}

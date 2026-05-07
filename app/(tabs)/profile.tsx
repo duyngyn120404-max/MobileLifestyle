@@ -42,8 +42,13 @@ export default function ProfileScreen() {
       {
         text: "Logout",
         onPress: async () => {
-          await signOut();
-          router.replace("/auth");
+          console.log('[logout] pressing logout...');
+          try {
+            await signOut();
+            console.log('[logout] signOut done, user should be null');
+          } catch (e) {
+            console.error('[logout] error:', e);
+          }
         },
       },
     ]);

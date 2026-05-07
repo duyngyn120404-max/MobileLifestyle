@@ -37,13 +37,7 @@ export interface Message {
   image?: string;
   liked?: boolean;
   disliked?: boolean;
-  // DataCollection flow
-  pendingConfirm?: {
-    reviewItems: ReviewRecord[];
-    autoAcceptIds: { table: "bp_records" | "clinical_facts"; recordId: string }[];
-  };
   reviewItems?: ReviewRecord[];
-  autoAcceptIds?: { table: "bp_records" | "clinical_facts"; recordId: string }[];
 }
 
 export interface ChatSession {
@@ -53,7 +47,6 @@ export interface ChatSession {
 }
 
 export type IntentMode =
-  | "auto"
   | "personal_medical_qa"
   | "general_medical_qa"
   | "data_collection";
@@ -61,5 +54,6 @@ export type IntentMode =
 export interface ReviewRecord {
   table: "bp_records" | "clinical_facts";
   recordId: string;
+  label: string;
   decision: "accepted" | "rejected" | null;
 }

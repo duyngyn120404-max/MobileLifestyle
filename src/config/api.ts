@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:8001/api/v1";
+const API_BASE_URL = "https://55f6-14-161-1-203.ngrok-free.app/api/v1";
 
 export const API_ROUTES = {
   // Conversations
@@ -8,6 +8,8 @@ export const API_ROUTES = {
 
   // Healthcare
   GENERATE_HEALTHCARE_REPORT: "/generate_healthcare_report",
+  HEALTHCARE_REPORT: "/healthcare_report",
+  ASSESSMENT_COMPARISON: "/assessment_comparison",
 
   // Ingestion
   INGEST: "/ingest",

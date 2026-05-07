@@ -60,15 +60,122 @@ export interface SendMessageResponse {
   ingestion_result?: IngestionResult;
 }
 
+export interface BPReading {
+  systolic: number;
+  diastolic: number;
+  source?: string;
+  day_period?: string;
+}
+
+export interface ClinicalFactRecord {
+  id: string;
+  fact_key: string;
+}
+
 export interface IngestionResult {
-  severity: string;
-  requires_review: boolean;
-  requires_immediate_confirmation: boolean;
+  status: 'accepted' | 'pending' | 'needs_clarification';
+  needs_clarification: boolean;
+  clarification_questions: string[];
   inserted: {
     bp_records: string[];
-    clinical_facts: string[];
+    clinical_facts: ClinicalFactRecord[];
   };
-  extraction?: Record<string, unknown>;
+  extraction?: {
+    bp_readings?: BPReading[];
+    risk_factors?: Record<string, boolean>;
+    [key: string]: unknown;
+  };
+  safety?: {
+    is_valid: boolean;
+    flags: string[];
+  };
+}
+
+// ── Healthcare report types ────────────────────────────────────────────────
+
+export interface MeasurementQualityItem {
+  source: string;
+  quality_score: number;
+  quality_level: string;
+  usable: boolean;
+  flags: string[];
+}
+
+export interface BpAverages {
+  clinic?: { sys?: number | null; dia?: number | null };
+  home?: { sys?: number | null; dia?: number | null };
+  abpm?: { sys?: number | null; dia?: number | null };
+}
+
+export interface HealthcareReport {
+  user_id: string;
+  classification: {
+    bp_category?: string;
+    bp_stage?: string;
+    phenotype?: string;
+    source_used?: string;
+    confidence?: string;
+    data_source?: string;
+    data_timestamp?: string;
+    averages?: BpAverages;
+    measurement_quality?: MeasurementQualityItem[];
+    [key: string]: unknown;
+  };
+  clinical_reasoning?: { explanation?: string; recommendation?: string; confidence?: string } | null;
+  risk?: {
+    risk_level?: string;
+    recommendation?: string;
+    explanation?: string;
+    confidence?: string;
+    data_source?: string;
+    data_timestamp?: string;
+  } | null;
+  ml_risk?: { risk_score?: number; risk_label?: string; model_version?: string } | null;
+  clinical_facts?: Record<string, Record<string, boolean>>;
+  pipeline_ran?: boolean;
+}
+
+export interface LatestReportResponse {
+  report: HealthcareReport | null;
+}
+
+export interface GenerateReportResponse {
+  report: HealthcareReport;
+  pipeline_ran: boolean;
+}
+
+export interface AskReportResponse {
+  answer: string;
+  report: HealthcareReport;
+}
+
+export interface DiffField {
+  from?: unknown;
+  to?: unknown;
+  direction?: string;
+  delta?: number;
+}
+
+export interface AssessmentDiff {
+  overall_direction?: string;
+  classification?: Record<string, DiffField>;
+  ml_risk?: Record<string, DiffField>;
+  quality?: Record<string, unknown>;
+  stage2_risk?: Record<string, DiffField>;
+}
+
+export interface AssessmentSession {
+  classification?: Record<string, unknown>;
+  measurement_evaluations?: unknown[];
+  clinical_reasoning?: unknown;
+  risk_assessment?: unknown;
+  ml_risk?: { risk_score?: number; risk_label?: string } | null;
+}
+
+export interface AssessmentComparisonResponse {
+  session_a: AssessmentSession;
+  session_b: AssessmentSession;
+  diff: AssessmentDiff;
 }
 
 // ── API client ─────────────────────────────────────────────────────────────
@@ -117,6 +224,34 @@ export const apiClient = {
       method: 'POST',
       body: JSON.stringify(body),
     });
+  },
+
+  // Transcribe (audio → text)
+  async transcribe(audio: string, format: string): Promise<{ text?: string; transcription?: string }> {
+    return request('/transcribe', {
+      method: 'POST',
+      body: JSON.stringify({ audio, format }),
+    }, false);
+  },
+
+  // Healthcare report
+  async getLatestReport(): Promise<LatestReportResponse> {
+    return request(API_ROUTES.HEALTHCARE_REPORT);
+  },
+
+  async generateReport(): Promise<GenerateReportResponse> {
+    return request(API_ROUTES.GENERATE_HEALTHCARE_REPORT, {
+      method: 'POST',
+      body: JSON.stringify({ readings: [] }),
+    });
+  },
+
+  async getAssessmentComparison(sessionAId?: string, sessionBId?: string): Promise<AssessmentComparisonResponse> {
+    const params = new URLSearchParams();
+    if (sessionAId) params.set('session_a_id', sessionAId);
+    if (sessionBId) params.set('session_b_id', sessionBId);
+    const query = params.toString();
+    return request(`${API_ROUTES.ASSESSMENT_COMPARISON}${query ? `?${query}` : ''}`);
   },
 
   // Ingest review
