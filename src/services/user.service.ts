@@ -1,17 +1,30 @@
-import { userRepository, UserProfile, UpdateUserProfile } from '@/src/repositories/user.repository';
+import {
+  userRepository,
+  type UpdateUserProfile,
+} from "@/src/repositories/user.repository";
 
 export const userService = {
-  async createProfile(userId: string, email: string, fullName?: string): Promise<UserProfile> {
-    const { data, error } = await userRepository.create(userId, email, fullName);
-    if (error) throw error;
-    if (!data) throw new Error('Failed to create user profile');
+  async getProfile(userId: string) {
+    const { data, error } = await userRepository.getById(userId);
+
+    if (error) {
+      throw error instanceof Error
+        ? error
+        : new Error("Không thể tải hồ sơ người dùng.");
+    }
+
     return data;
   },
 
-  async updateProfile(userId: string, updates: Partial<UpdateUserProfile>): Promise<UserProfile> {
+  async updateProfile(userId: string, updates: Partial<UpdateUserProfile>) {
     const { data, error } = await userRepository.update(userId, updates);
-    if (error) throw error;
-    if (!data) throw new Error('Failed to update user profile');
+
+    if (error) {
+      throw error instanceof Error
+        ? error
+        : new Error("Không thể cập nhật hồ sơ người dùng.");
+    }
+
     return data;
   },
 };
