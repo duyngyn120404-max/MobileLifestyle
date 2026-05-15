@@ -2,7 +2,8 @@ import { useAuth } from "@/src/contexts/auth-context";
 import { apiClient, BpAverages, HealthcareReport, MeasurementQualityItem } from "@/src/config/apiClient";
 import { Pressable } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -61,26 +62,28 @@ export default function StatScreen() {
     if (res) setClinicalReport(res.report);
   };
 
-  useEffect(() => {
-    let mounted = true;
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
 
-    const load = async () => {
-      try {
-        setLoading(true);
-        await fetchDashboardData();
-      } catch (error) {
-        console.error("LOAD_STAT_DASHBOARD_ERROR", error);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
+      const load = async () => {
+        try {
+          setLoading(true);
+          await fetchDashboardData();
+        } catch (error) {
+          console.error("LOAD_STAT_DASHBOARD_ERROR", error);
+        } finally {
+          if (mounted) setLoading(false);
+        }
+      };
 
-    load();
+      load();
 
-    return () => {
-      mounted = false;
-    };
-  }, [user?.id]);
+      return () => {
+        mounted = false;
+      };
+    }, [user?.id])
+  );
 
   const onRefresh = async () => {
     try {

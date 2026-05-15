@@ -12,7 +12,12 @@ function RouteGuard({children}: {children: React.ReactNode}) {
 
   useEffect(() => {
     const inAuthGroup = segments[0] === "(auth)"
-    console.log('[RouteGuard] user:', user?.id ?? null, 'isLoadingUser:', isLoadingUser, 'inAuthGroup:', inAuthGroup);
+    const seg0 = segments[0] as string | undefined
+    const inWelcome = !seg0 || seg0 === "index"
+    console.log('[RouteGuard] user:', user?.id ?? null, 'isLoadingUser:', isLoadingUser, 'inAuthGroup:', inAuthGroup, 'inWelcome:', inWelcome);
+
+    // Welcome screen tự xử lý navigation, không can thiệp
+    if (inWelcome) return;
 
     // Nếu đang load, không làm gì
     if (isLoadingUser) {
@@ -40,7 +45,8 @@ export default function RootLayout() {
         <PaperProvider>
           <SafeAreaProvider>
             <RouteGuard>
-              <Stack screenOptions={{headerShown: true}}>  
+              <Stack screenOptions={{headerShown: true}}>
+                <Stack.Screen name="index" options={{headerShown: false, animation: "none"}} />
                 <Stack.Screen name="(tabs)" options={{headerShown: false}} />
                 <Stack.Screen name="(auth)" options={{headerShown: false}} />
                 <Stack.Screen name="(disease)" options={{headerShown: false}} />

@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from "react-native";
-import { Button, TextInput, Snackbar } from "react-native-paper";
+import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Keyboard, Pressable, TextInput as RNTextInput } from "react-native";
+import { Button, Snackbar } from "react-native-paper";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { DISEASE_LIST } from "@/src/constants/diseases";
@@ -63,42 +63,45 @@ export default function DiseaseInputScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.header}>
-          <Button icon="arrow-left" mode="text" onPress={() => router.back()} style={styles.backButton}>
-            Trở về
-          </Button>
-          <Text style={styles.title}>{disease?.name || name}</Text>
-          <Text style={styles.subtitle}>Nhập các chỉ số chi tiết</Text>
-        </View>
+      <ScrollView style={styles.scrollView} keyboardShouldPersistTaps="never" onScrollBeginDrag={Keyboard.dismiss}>
+        <Pressable onPress={Keyboard.dismiss} style={{ flex: 1 }}>
+          <View style={styles.header}>
+            <Button icon="arrow-left" mode="text" onPress={() => router.back()} style={styles.backButton}>
+              Trở về
+            </Button>
+            <Text style={styles.title}>{disease?.name || name}</Text>
+            <Text style={styles.subtitle}>Nhập các chỉ số chi tiết</Text>
+          </View>
 
-        <View style={styles.form}>
-          {disease?.fields.map((field, index) => (
-            <View key={index} style={styles.inputGroup}>
-              <Text style={styles.label}>{field.name}</Text>
-              <View style={styles.inputContainer}>
-                <TextInput
-                  placeholder={field.placeholder}
-                  value={formData[field.name] || ""}
-                  onChangeText={(value) => handleInputChange(field.name, value)}
-                  keyboardType={getKeyboardType(field.type)}
-                  style={styles.input}
-                />
-                <Text style={styles.unit}>{field.unit}</Text>
+          <View style={styles.form}>
+            {disease?.fields.map((field, index) => (
+              <View key={index} style={styles.inputGroup}>
+                <Text style={styles.label}>{field.name}</Text>
+                <View style={styles.inputContainer}>
+                  <RNTextInput
+                    placeholder={field.placeholder}
+                    value={formData[field.name] || ""}
+                    onChangeText={(value) => handleInputChange(field.name, value)}
+                    keyboardType={getKeyboardType(field.type)}
+                    style={styles.input}
+                    placeholderTextColor="#aaa"
+                  />
+                  <Text style={styles.unit}>{field.unit}</Text>
+                </View>
               </View>
-            </View>
-          ))}
+            ))}
 
-          <Button
-            mode="contained"
-            style={styles.submitButton}
-            onPress={handleSubmit}
-            disabled={isLoading}
-            loading={isLoading}
-          >
-            {isLoading ? "Đang lưu..." : "Lưu dữ liệu"}
-          </Button>
-        </View>
+            <Button
+              mode="contained"
+              style={styles.submitButton}
+              onPress={handleSubmit}
+              disabled={isLoading}
+              loading={isLoading}
+            >
+              {isLoading ? "Đang lưu..." : "Lưu dữ liệu"}
+            </Button>
+          </View>
+        </Pressable>
       </ScrollView>
 
       <Snackbar
@@ -124,7 +127,18 @@ const styles = StyleSheet.create({
   inputGroup: { marginBottom: 16 },
   label: { fontSize: 14, fontWeight: "600", color: "#333", marginBottom: 8 },
   inputContainer: { flexDirection: "row", alignItems: "center" },
-  input: { flex: 1, marginRight: 8, borderRadius: 20 },
+  input: {
+    flex: 1,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    fontSize: 16,
+    backgroundColor: "#fff",
+    color: "#333",
+  },
   unit: { fontSize: 12, color: "#999", fontWeight: "500", minWidth: 50, textAlign: "right" },
   submitButton: { marginTop: 16, paddingVertical: 8 },
 });

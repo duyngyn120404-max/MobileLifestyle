@@ -79,15 +79,42 @@ export const chatService = {
     if (ingestionResult.needs_clarification) return [];
     const items: ReviewRecord[] = [];
 
+    const DAY_PERIOD_LABELS: Record<string, string> = {
+      morning: 'Sáng', afternoon: 'Chiều', evening: 'Tối', night: 'Đêm',
+    };
+    const SOURCE_LABELS: Record<string, string> = {
+      HBPM: 'Tại nhà', OBPM: 'Phòng khám', ABPM: 'Máy 24h',
+    };
+    const POSITION_LABELS: Record<string, string> = {
+      sitting: 'Ngồi', standing: 'Đứng', lying: 'Nằm',
+    };
+    const DEVICE_LABELS: Record<string, string> = {
+      upper_arm: 'Đo bắp tay', wrist: 'Đo cổ tay',
+    };
+
     // BP records — map each inserted ID to the corresponding extraction reading
     const bpReadings = ingestionResult.extraction?.bp_readings ?? [];
     ingestionResult.inserted.bp_records.forEach((id, i) => {
       const r = bpReadings[i];
-      const period = r?.day_period === 'morning' ? ' (sáng)' : r?.day_period === 'afternoon' ? ' (chiều)' : r?.day_period === 'evening' ? ' (tối)' : r?.day_period === 'night' ? ' (đêm)' : '';
+      const period = r?.day_period ? ` (${DAY_PERIOD_LABELS[r.day_period] ?? r.day_period})` : '';
       const label = r
         ? `Huyết áp: ${r.systolic}/${r.diastolic} mmHg${period}`
         : `Chỉ số huyết áp #${i + 1}`;
-      items.push({ table: 'bp_records', recordId: id, label, decision: null });
+
+      const details: { label: string; value: string }[] = [];
+      if (r) {
+        if (r.source) details.push({ label: 'Nguồn đo', value: SOURCE_LABELS[r.source] ?? r.source });
+        if (r.day_period) details.push({ label: 'Buổi', value: DAY_PERIOD_LABELS[r.day_period] ?? r.day_period });
+        if ((r as any).position) details.push({ label: 'Tư thế', value: POSITION_LABELS[(r as any).position] ?? (r as any).position });
+        if ((r as any).rested_minutes != null) details.push({ label: 'Nghỉ trước đo', value: `${(r as any).rested_minutes} phút` });
+        if ((r as any).device_type) details.push({ label: 'Thiết bị', value: DEVICE_LABELS[(r as any).device_type] ?? (r as any).device_type });
+        if ((r as any).datetime) {
+          const dt = new Date((r as any).datetime);
+          if (!isNaN(dt.getTime())) details.push({ label: 'Thời gian', value: dt.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' }) });
+        }
+      }
+
+      items.push({ table: 'bp_records', recordId: id, label, details: details.length ? details : undefined, decision: null });
     });
 
     // Clinical facts — backend already filtered to value=true only, with fact_key

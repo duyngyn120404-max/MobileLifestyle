@@ -1,9 +1,10 @@
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
+import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Modal, Alert } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/src/contexts/auth-context";
 import { useChatController } from "@/src/controllers/useChatController";
 import { Message, ReviewRecord, IntentMode } from "@/src/types";
+import { apiClient } from "@/src/config/apiClient";
 
 import { audioService } from "@/src/services/audio.service";
 
@@ -86,10 +87,19 @@ function ReviewCard({
       </View>
       {items.map((item, index) => {
         if (item.decision !== null) return null;
-        const label = item.label;
         return (
           <View key={item.recordId} style={reviewStyles.row}>
-            <Text style={reviewStyles.rowLabel}>{label}</Text>
+            <Text style={reviewStyles.rowLabel}>{item.label}</Text>
+            {item.details && item.details.length > 0 && (
+              <View style={reviewStyles.detailsGrid}>
+                {item.details.map(d => (
+                  <View key={d.label} style={reviewStyles.detailChip}>
+                    <Text style={reviewStyles.detailKey}>{d.label}: </Text>
+                    <Text style={reviewStyles.detailValue}>{d.value}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
             <View style={reviewStyles.btnGroup}>
               <TouchableOpacity
                 style={[reviewStyles.btn, reviewStyles.acceptBtn]}
@@ -121,8 +131,16 @@ const reviewStyles = StyleSheet.create({
   cardHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10 },
   cardTitle: { fontSize: 13, fontWeight: "600", color: "#007AFF" },
   row: { flexDirection: "column", gap: 6, marginBottom: 10 },
-  rowLabel: { fontSize: 13, color: "#333" },
-  btnGroup: { flexDirection: "row", gap: 8 },
+  rowLabel: { fontSize: 13, fontWeight: "600", color: "#222" },
+  detailsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 2 },
+  detailChip: {
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: "#E8F1FB", borderRadius: 6,
+    paddingHorizontal: 7, paddingVertical: 3,
+  },
+  detailKey: { fontSize: 11, color: "#555" },
+  detailValue: { fontSize: 11, color: "#1a5fa8", fontWeight: "600" },
+  btnGroup: { flexDirection: "row", gap: 8, marginTop: 2 },
   btn: {
     flexDirection: "row", alignItems: "center", gap: 4,
     paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
@@ -130,6 +148,231 @@ const reviewStyles = StyleSheet.create({
   acceptBtn: { backgroundColor: "#34C759" },
   rejectBtn: { backgroundColor: "#FF3B30" },
   btnText: { fontSize: 12, color: "#fff", fontWeight: "600" },
+});
+
+// ── BP Input Form ──────────────────────────────────────────────────────────
+
+type BPFormState = {
+  systolic: string;
+  diastolic: string;
+  position: 'sitting' | 'standing' | 'lying' | null;
+  day_period: 'morning' | 'afternoon' | 'evening' | 'night' | null;
+  rested_minutes: string;
+  source: 'HBPM' | 'OBPM' | 'ABPM';
+};
+
+const POSITION_OPTIONS = [
+  { value: 'sitting' as const,  label: 'Ngồi' },
+  { value: 'standing' as const, label: 'Đứng' },
+  { value: 'lying' as const,    label: 'Nằm' },
+];
+
+const DAY_PERIOD_OPTIONS = [
+  { value: 'morning' as const,   label: 'Sáng' },
+  { value: 'afternoon' as const, label: 'Chiều' },
+  { value: 'evening' as const,   label: 'Tối' },
+  { value: 'night' as const,     label: 'Đêm' },
+];
+
+const SOURCE_OPTIONS = [
+  { value: 'HBPM' as const, label: 'Tại nhà' },
+  { value: 'OBPM' as const, label: 'Phòng khám' },
+  { value: 'ABPM' as const, label: 'Máy 24h' },
+];
+
+function BPInputForm({
+  visible,
+  userId,
+  onClose,
+  onSuccess,
+}: {
+  visible: boolean;
+  userId: string;
+  onClose: () => void;
+  onSuccess: (recordId: string) => void;
+}) {
+  const [form, setForm] = useState<BPFormState>({
+    systolic: '',
+    diastolic: '',
+    position: null,
+    day_period: null,
+    rested_minutes: '',
+    source: 'HBPM',
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const set = <K extends keyof BPFormState>(key: K, value: BPFormState[K]) =>
+    setForm(prev => ({ ...prev, [key]: value }));
+
+  const handleSubmit = async () => {
+    const sys = parseInt(form.systolic);
+    const dia = parseInt(form.diastolic);
+    if (!sys || !dia) {
+      Alert.alert('Thiếu thông tin', 'Vui lòng nhập chỉ số huyết áp.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await apiClient.ingestBP({
+        user_id: userId,
+        systolic: sys,
+        diastolic: dia,
+        source: form.source,
+        position: form.position ?? undefined,
+        day_period: form.day_period ?? undefined,
+        rested_minutes: form.rested_minutes ? parseFloat(form.rested_minutes) : undefined,
+      });
+      setForm({ systolic: '', diastolic: '', position: null, day_period: null, rested_minutes: '', source: 'HBPM' });
+      onSuccess(res.record_id);
+    } catch (e: any) {
+      Alert.alert('Lỗi', e?.message ?? 'Không thể ghi nhận. Vui lòng thử lại.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={bpStyles.modalContainer}>
+        <TouchableOpacity style={bpStyles.backdrop} activeOpacity={1} onPress={onClose} />
+        <View style={bpStyles.sheet}>
+        <View style={bpStyles.handle} />
+        <Text style={bpStyles.title}>Nhập chỉ số huyết áp</Text>
+
+        {/* BP numbers */}
+        <View style={bpStyles.bpRow}>
+          <View style={bpStyles.bpField}>
+            <Text style={bpStyles.label}>Tâm thu (trên)</Text>
+            <TextInput
+              style={bpStyles.bpInput}
+              keyboardType="number-pad"
+              placeholder="120"
+              value={form.systolic}
+              onChangeText={v => set('systolic', v)}
+            />
+          </View>
+          <Text style={bpStyles.slash}>/</Text>
+          <View style={bpStyles.bpField}>
+            <Text style={bpStyles.label}>Tâm trương (dưới)</Text>
+            <TextInput
+              style={bpStyles.bpInput}
+              keyboardType="number-pad"
+              placeholder="80"
+              value={form.diastolic}
+              onChangeText={v => set('diastolic', v)}
+            />
+          </View>
+          <Text style={bpStyles.unit}>mmHg</Text>
+        </View>
+
+        {/* Source */}
+        <Text style={bpStyles.label}>Nơi đo</Text>
+        <View style={bpStyles.chipRow}>
+          {SOURCE_OPTIONS.map(opt => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[bpStyles.chip, form.source === opt.value && bpStyles.chipActive]}
+              onPress={() => set('source', opt.value)}
+            >
+              <Text style={[bpStyles.chipText, form.source === opt.value && bpStyles.chipTextActive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Position */}
+        <Text style={bpStyles.label}>Tư thế đo</Text>
+        <View style={bpStyles.chipRow}>
+          {POSITION_OPTIONS.map(opt => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[bpStyles.chip, form.position === opt.value && bpStyles.chipActive]}
+              onPress={() => set('position', opt.value)}
+            >
+              <Text style={[bpStyles.chipText, form.position === opt.value && bpStyles.chipTextActive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Day period */}
+        <Text style={bpStyles.label}>Buổi đo</Text>
+        <View style={bpStyles.chipRow}>
+          {DAY_PERIOD_OPTIONS.map(opt => (
+            <TouchableOpacity
+              key={opt.value}
+              style={[bpStyles.chip, form.day_period === opt.value && bpStyles.chipActive]}
+              onPress={() => set('day_period', opt.value)}
+            >
+              <Text style={[bpStyles.chipText, form.day_period === opt.value && bpStyles.chipTextActive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Rested minutes */}
+        <Text style={bpStyles.label}>Nghỉ ngơi trước đo (phút)</Text>
+        <TextInput
+          style={bpStyles.textInput}
+          keyboardType="number-pad"
+          placeholder="VD: 5"
+          value={form.rested_minutes}
+          onChangeText={v => set('rested_minutes', v)}
+        />
+
+        {/* Submit */}
+        <TouchableOpacity
+          style={[bpStyles.submitBtn, submitting && bpStyles.submitBtnDisabled]}
+          onPress={handleSubmit}
+          disabled={submitting}
+        >
+          <Text style={bpStyles.submitText}>{submitting ? 'Đang ghi nhận...' : 'Ghi nhận'}</Text>
+        </TouchableOpacity>
+      </View>
+      </View>
+    </Modal>
+  );
+}
+
+const bpStyles = StyleSheet.create({
+  modalContainer: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: {
+    backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    padding: 20, paddingBottom: 40, gap: 10,
+  },
+  handle: { width: 40, height: 4, backgroundColor: '#ddd', borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
+  title: { fontSize: 17, fontWeight: '700', color: '#111', marginBottom: 4 },
+  label: { fontSize: 13, fontWeight: '600', color: '#444', marginTop: 4 },
+  bpRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginVertical: 4 },
+  bpField: { flex: 1 },
+  bpInput: {
+    borderWidth: 1, borderColor: '#ddd', borderRadius: 10,
+    padding: 12, fontSize: 22, fontWeight: '700', textAlign: 'center', color: '#111',
+  },
+  slash: { fontSize: 28, fontWeight: '300', color: '#999', paddingBottom: 10 },
+  unit: { fontSize: 13, color: '#999', paddingBottom: 12 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
+  chip: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: '#f0f0f0', borderWidth: 1, borderColor: '#ddd',
+  },
+  chipActive: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
+  chipText: { fontSize: 14, color: '#444', fontWeight: '500' },
+  chipTextActive: { color: '#fff' },
+  textInput: {
+    borderWidth: 1, borderColor: '#ddd', borderRadius: 10,
+    padding: 12, fontSize: 15, color: '#111', marginTop: 4,
+  },
+  submitBtn: {
+    backgroundColor: '#007AFF', borderRadius: 12,
+    padding: 16, alignItems: 'center', marginTop: 8,
+  },
+  submitBtnDisabled: { backgroundColor: '#99c4f5' },
+  submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });
 
 // ── Main screen ────────────────────────────────────────────────────────────
@@ -159,6 +402,8 @@ export default function BotScreen() {
     likeMessage,
     dislikeMessage,
   } = useChatController();
+
+  const [bpFormVisible, setBpFormVisible] = useState(false);
 
   useEffect(() => {
     audioService.requestPermissions();
@@ -240,6 +485,7 @@ export default function BotScreen() {
   };
 
   return (
+    <>
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
@@ -275,38 +521,46 @@ export default function BotScreen() {
 
         {/* Intent selector + Input */}
         <IntentSelector value={intentMode} onChange={setIntentMode} />
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Nhập tin nhắn hoặc nói..."
-            placeholderTextColor="#999"
-            value={inputMessage}
-            onChangeText={setInputMessage}
-            multiline
-            editable={!isLoading && !isRecording}
-          />
-          <TouchableOpacity
-            style={[styles.iconButton, isRecording && styles.recordingButton]}
-            onPress={isRecording ? stopRecording : startRecording}
-          >
-            <MaterialCommunityIcons
-              name={isRecording ? "microphone-off" : "microphone"}
-              size={24}
-              color={isRecording ? "#FF3B30" : "#007AFF"}
-            />
+        {intentMode === 'data_collection' ? (
+          <TouchableOpacity style={styles.bpTriggerBtn} onPress={() => { console.log('BP button pressed, visible:', bpFormVisible); setBpFormVisible(true); }}>
+            <MaterialCommunityIcons name="heart-pulse" size={20} color="#fff" />
+            <Text style={styles.bpTriggerText}>Nhập chỉ số huyết áp</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.sendButton, !inputMessage.trim() && styles.sendButtonDisabled]}
-            onPress={sendMessage}
-            disabled={isLoading || !inputMessage.trim() || isRecording}
-          >
-            <MaterialCommunityIcons
-              name="send"
-              size={20}
-              color={(isLoading || !inputMessage.trim() || isRecording) ? "#ccc" : "#fff"}
+        ) : (
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập tin nhắn hoặc nói..."
+              placeholderTextColor="#999"
+              value={inputMessage}
+              onChangeText={setInputMessage}
+              multiline
+              editable={!isLoading && !isRecording}
             />
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.iconButton, isRecording && styles.recordingButton]}
+              onPress={isRecording ? stopRecording : startRecording}
+            >
+              <MaterialCommunityIcons
+                name={isRecording ? "microphone-off" : "microphone"}
+                size={24}
+                color={isRecording ? "#FF3B30" : "#007AFF"}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sendButton, !inputMessage.trim() && styles.sendButtonDisabled]}
+              onPress={sendMessage}
+              disabled={isLoading || !inputMessage.trim() || isRecording}
+            >
+              <MaterialCommunityIcons
+                name="send"
+                size={20}
+                color={(isLoading || !inputMessage.trim() || isRecording) ? "#ccc" : "#fff"}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+
       </View>
 
       {/* Overlay & Sidebar */}
@@ -359,6 +613,17 @@ export default function BotScreen() {
         </>
       )}
     </KeyboardAvoidingView>
+
+    <BPInputForm
+      visible={bpFormVisible}
+      userId={user?.id ?? ''}
+      onClose={() => setBpFormVisible(false)}
+      onSuccess={() => {
+        setBpFormVisible(false);
+        Alert.alert('Đã ghi nhận', 'Chỉ số huyết áp đã được lưu thành công.');
+      }}
+    />
+    </>
   );
 }
 
@@ -399,6 +664,11 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 16,
     paddingVertical: 14, backgroundColor: "#fff", gap: 10,
   },
+  bpTriggerBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    margin: 16, padding: 16, backgroundColor: "#007AFF", borderRadius: 14,
+  },
+  bpTriggerText: { color: "#fff", fontSize: 16, fontWeight: "700" },
   input: {
     flex: 1, backgroundColor: "#f5f5f5", borderRadius: 24,
     paddingHorizontal: 18, paddingVertical: 11, fontSize: 15, color: "#333", maxHeight: 100,

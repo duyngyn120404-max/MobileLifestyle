@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://55f6-14-161-1-203.ngrok-free.app/api/v1";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? "http://localhost:8001/api/v1";
 
 export const API_ROUTES = {
   // Conversations
@@ -14,6 +14,7 @@ export const API_ROUTES = {
   // Ingestion
   INGEST: "/ingest",
   INGEST_REVIEW: "/ingest/review",
+  INGEST_BP: "/ingest/bp",
 } as const;
 
 export { API_BASE_URL };

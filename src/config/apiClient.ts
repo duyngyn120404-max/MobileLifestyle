@@ -2,13 +2,21 @@ import { API_BASE_URL, API_ROUTES } from './api';
 import { supabase } from '@/src/services/supabase';
 
 async function getAuthHeader(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error('Not authenticated');
-  return { Authorization: `Bearer ${session.access_token}` };
+  console.log('[apiClient] getAuthHeader called');
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    console.log('[apiClient] getSession session:', session?.user?.id ?? null, 'error:', error);
+    if (!session?.access_token) throw new Error('Not authenticated');
+    return { Authorization: `Bearer ${session.access_token}` };
+  } catch (e) {
+    console.log('[apiClient] getAuthHeader exception:', e);
+    throw e;
+  }
 }
 
 const DEFAULT_HEADERS = {
   'Content-Type': 'application/json',
+  'ngrok-skip-browser-warning': 'true',
 };
 
 async function request<T = unknown>(
@@ -16,12 +24,15 @@ async function request<T = unknown>(
   options: RequestInit = {},
   withAuth = true
 ): Promise<T> {
+  const url = `${API_BASE_URL}${path}`;
+  console.log('[apiClient] request', options.method ?? 'GET', url);
   const authHeaders = withAuth ? await getAuthHeader() : {};
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(url, {
     ...options,
     headers: { ...DEFAULT_HEADERS, ...authHeaders, ...options.headers },
   });
 
+  console.log('[apiClient] response status:', response.status, url);
   if (!response.ok) {
     const errorText = await response.text().catch(() => 'Unknown error');
     throw new Error(`[${response.status}] ${path}: ${errorText}`);
@@ -65,6 +76,30 @@ export interface BPReading {
   diastolic: number;
   source?: string;
   day_period?: string;
+}
+
+export interface BPRecordRequest {
+  user_id: string;
+  systolic: number;
+  diastolic: number;
+  source?: 'HBPM' | 'OBPM' | 'ABPM';
+  position?: 'sitting' | 'standing' | 'lying';
+  day_period?: 'morning' | 'afternoon' | 'evening' | 'night';
+  rested_minutes?: number;
+  device_type?: 'upper_arm' | 'wrist';
+  device_validated?: boolean;
+  measured_at?: string;
+  patient_info?: { age?: number; gender?: 'male' | 'female' };
+  risk_factors?: Record<string, boolean>;
+  hmod?: Record<string, boolean>;
+  cardiovascular_disease?: Record<string, boolean>;
+  symptoms?: string[];
+}
+
+export interface BPRecordResponse {
+  status: 'accepted' | 'pending';
+  record_id: string;
+  safety: { is_valid: boolean; flags: string[] };
 }
 
 export interface ClinicalFactRecord {
@@ -252,6 +287,14 @@ export const apiClient = {
     if (sessionBId) params.set('session_b_id', sessionBId);
     const query = params.toString();
     return request(`${API_ROUTES.ASSESSMENT_COMPARISON}${query ? `?${query}` : ''}`);
+  },
+
+  // Ingest BP form
+  async ingestBP(data: BPRecordRequest): Promise<BPRecordResponse> {
+    return request(API_ROUTES.INGEST_BP, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   },
 
   // Ingest review

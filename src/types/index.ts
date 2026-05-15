@@ -55,5 +55,6 @@ export interface ReviewRecord {
   table: "bp_records" | "clinical_facts";
   recordId: string;
   label: string;
+  details?: { label: string; value: string }[];
   decision: "accepted" | "rejected" | null;
 }
