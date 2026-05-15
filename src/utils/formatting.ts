@@ -10,7 +10,7 @@ export const capitalizeName = (name: string): string => {
   if (!name) return "User";
   return name
     .split(" ")
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
 };
 
@@ -49,7 +49,10 @@ export const formatDateTimeVN = (date: Date): string => {
  */
 export const cleanTextForSpeech = (text: string): string => {
   return text
-    .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{27BF}]|[\u{1F000}-\u{1F02F}]/gu, "") // Remove emojis
+    .replace(
+      /[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{27BF}]|[\u{1F000}-\u{1F02F}]/gu,
+      "",
+    ) // Remove emojis
     .replace(/[*_`]/g, "") // Remove markdown
     .replace(/^[\s]*[•\-\*]\s+/gm, "") // Remove bullets
     .replace(/^#+\s+/gm, "") // Remove headers

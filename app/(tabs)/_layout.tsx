@@ -1,56 +1,120 @@
-import { Tabs } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+
+const TAB_COLORS = {
+  primary: "#0E7490",
+  inactive: "#7A8F95",
+  background: "#FCFEFE",
+  border: "#D8E7E8",
+};
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#007AFF",
         headerShown: false,
+        tabBarActiveTintColor: TAB_COLORS.primary,
+        tabBarInactiveTintColor: TAB_COLORS.inactive,
+        tabBarStyle: {
+          backgroundColor: TAB_COLORS.background,
+          borderTopColor: TAB_COLORS.border,
+          height: 64,
+          paddingTop: 8,
+          paddingBottom: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: "700",
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: "Trang chủ",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <MaterialCommunityIcons name="home" size={24} color={color} />
+          tabBarIcon: ({
+            color,
+            size,
+            focused,
+          }: {
+            color: string;
+            size: number;
+            focused: boolean;
+          }) => (
+            <MaterialCommunityIcons
+              name={focused ? "home" : "home-outline"}
+              color={color}
+              size={size}
+            />
           ),
         }}
       />
 
-    <Tabs.Screen
+      <Tabs.Screen
         name="stat"
         options={{
-          title: "Trực quan",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <MaterialCommunityIcons name="chart-line" size={24} color={color} />
+          title: "Thống kê",
+          tabBarIcon: ({
+            color,
+            size,
+            focused,
+          }: {
+            color: string;
+            size: number;
+            focused: boolean;
+          }) => (
+            <MaterialCommunityIcons
+              name={focused ? "chart-line" : "chart-line-variant"}
+              color={color}
+              size={size}
+            />
           ),
         }}
       />
 
-    <Tabs.Screen
+      <Tabs.Screen
         name="bot"
         options={{
-            title: "Bot",
-            tabBarIcon: ({ color }: { color: string }) => (
-            <MaterialCommunityIcons name="robot" size={24} color={color} />
-            ),
+          title: "Bot",
+          tabBarIcon: ({
+            color,
+            size,
+            focused,
+          }: {
+            color: string;
+            size: number;
+            focused: boolean;
+          }) => (
+            <MaterialCommunityIcons
+              name={focused ? "robot" : "robot-outline"}
+              color={color}
+              size={size}
+            />
+          ),
         }}
-    />
+      />
 
-    <Tabs.Screen
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Hồ sơ",
-          tabBarIcon: ({ color }: { color: string }) => (
-            <MaterialCommunityIcons name="account" size={24} color={color} />
+          tabBarIcon: ({
+            color,
+            size,
+            focused,
+          }: {
+            color: string;
+            size: number;
+            focused: boolean;
+          }) => (
+            <MaterialCommunityIcons
+              name={focused ? "account" : "account-outline"}
+              color={color}
+              size={size}
+            />
           ),
         }}
-    />
-
-
-
+      />
     </Tabs>
   );
 }

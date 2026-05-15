@@ -1,20 +1,238 @@
+// import type {
+//   BpRecordInsert,
+//   ClinicalFactInsert,
+//   HealthDataSource,
+// } from "@/src/config/supabaseApi";
+// import {
+//   homeHealthRepository,
+//   type BpRecord,
+//   type ClinicalFact,
+// } from "@/src/repositories/home-health.repository";
+
+// export type BpSource = "HBPM" | "OBPM" | "ABPM";
+// export type DayPeriod = "morning" | "afternoon" | "evening" | "night";
+// export type PositionType = "sitting" | "standing" | "lying";
+// export type DeviceType = "upper_arm" | "wrist";
+
+// export interface HomeHealthFormInput {
+//   userId: string;
+//   systolic: string;
+//   diastolic: string;
+//   bpSource: BpSource;
+//   dayPeriod: DayPeriod;
+//   position: PositionType;
+//   restedMinutes: string;
+//   deviceType: DeviceType;
+//   deviceValidated: boolean;
+//   measuredAt: string;
+//   riskFactors: string[];
+//   hmodItems: string[];
+//   cardiovascularDiseases: string[];
+//   symptoms: string[];
+//   medications: string[];
+//   source: HealthDataSource | string;
+// }
+
+// const FACT_GROUPS = [
+//   "risk_factors",
+//   "hmod",
+//   "cardiovascular_disease",
+//   "symptoms",
+//   "medications",
+// ] as const;
+
+// function parseOptionalNumber(value: string): number | null {
+//   const trimmed = value.trim();
+//   if (!trimmed) return null;
+//   const parsed = Number(trimmed);
+//   return Number.isNaN(parsed) ? null : parsed;
+// }
+
+// function toIsoOrNow(value: string): string {
+//   const trimmed = value.trim();
+//   if (!trimmed) return new Date().toISOString();
+//   const date = new Date(trimmed);
+//   if (Number.isNaN(date.getTime())) return new Date().toISOString();
+//   return date.toISOString();
+// }
+
+// function uniqueStrings(values: string[]): string[] {
+//   return [...new Set(values.map((item) => item.trim()).filter(Boolean))];
+// }
+
+// export const homeHealthService = {
+//   getSeverityFromBp(systolic: number, diastolic: number): string {
+//     if (systolic > 180 || diastolic > 120) return "crisis";
+//     if (systolic >= 140 || diastolic >= 90) return "stage_2";
+//     if (systolic >= 130 || diastolic >= 80) return "stage_1";
+//     if (systolic >= 120 && diastolic < 80) return "elevated";
+//     if (systolic < 90 || diastolic < 60) return "low";
+//     return "normal";
+//   },
+
+//   validateInput(input: HomeHealthFormInput): string | null {
+//     if (!input.systolic.trim() || !input.diastolic.trim()) {
+//       return "Vui lòng nhập đầy đủ huyết áp tâm thu và tâm trương";
+//     }
+
+//     const systolic = Number(input.systolic);
+//     const diastolic = Number(input.diastolic);
+
+//     if (Number.isNaN(systolic) || Number.isNaN(diastolic)) {
+//       return "Giá trị huyết áp phải là số hợp lệ";
+//     }
+
+//     if (systolic < 40 || systolic > 300) {
+//       return "Huyết áp tâm thu nằm ngoài khoảng hợp lý";
+//     }
+
+//     if (diastolic < 30 || diastolic > 200) {
+//       return "Huyết áp tâm trương nằm ngoài khoảng hợp lý";
+//     }
+
+//     return null;
+//   },
+
+//   buildBpRecord(input: HomeHealthFormInput): BpRecordInsert {
+//     const systolic = Number(input.systolic);
+//     const diastolic = Number(input.diastolic);
+
+//     return {
+//       user_id: input.userId,
+//       systolic,
+//       diastolic,
+//       source: input.bpSource,
+//       day_period: input.dayPeriod,
+//       position: input.position,
+//       rested_minutes: parseOptionalNumber(input.restedMinutes),
+//       device_type: input.deviceType,
+//       device_validated: input.deviceValidated,
+//       status: "accepted",
+//       severity: this.getSeverityFromBp(systolic, diastolic),
+//       created_at: toIsoOrNow(input.measuredAt),
+//     };
+//   },
+
+//   buildClinicalFacts(input: HomeHealthFormInput): ClinicalFactInsert[] {
+//     const rows: ClinicalFactInsert[] = [];
+//     const now = new Date().toISOString();
+
+//     uniqueStrings(input.riskFactors).forEach((factKey) => {
+//       rows.push({
+//         user_id: input.userId,
+//         fact_group: "risk_factors",
+//         fact_key: factKey,
+//         value: true,
+//         status: "accepted",
+//         severity: null,
+//         source: input.source,
+//         updated_at: now,
+//       });
+//     });
+
+//     uniqueStrings(input.hmodItems).forEach((factKey) => {
+//       rows.push({
+//         user_id: input.userId,
+//         fact_group: "hmod",
+//         fact_key: factKey,
+//         value: true,
+//         status: "accepted",
+//         severity: null,
+//         source: input.source,
+//         updated_at: now,
+//       });
+//     });
+
+//     uniqueStrings(input.cardiovascularDiseases).forEach((factKey) => {
+//       rows.push({
+//         user_id: input.userId,
+//         fact_group: "cardiovascular_disease",
+//         fact_key: factKey,
+//         value: true,
+//         status: "accepted",
+//         severity: null,
+//         source: input.source,
+//         updated_at: now,
+//       });
+//     });
+
+//     uniqueStrings(input.symptoms).forEach((factKey) => {
+//       rows.push({
+//         user_id: input.userId,
+//         fact_group: "symptoms",
+//         fact_key: factKey,
+//         value: true,
+//         status: "accepted",
+//         severity: null,
+//         source: input.source,
+//         updated_at: now,
+//       });
+//     });
+
+//     uniqueStrings(input.medications).forEach((factKey) => {
+//       rows.push({
+//         user_id: input.userId,
+//         fact_group: "medications",
+//         fact_key: factKey,
+//         value: true,
+//         status: "accepted",
+//         severity: null,
+//         source: input.source,
+//         updated_at: now,
+//       });
+//     });
+
+//     return rows;
+//   },
+
+//   async submitSimpleForm(input: HomeHealthFormInput): Promise<{
+//     bpRecords: BpRecord[];
+//     clinicalFacts: ClinicalFact[];
+//   }> {
+//     const validationError = this.validateInput(input);
+//     if (validationError) {
+//       throw new Error(validationError);
+//     }
+
+//     const bpRecord = this.buildBpRecord(input);
+//     const clinicalFacts = this.buildClinicalFacts(input);
+
+//     const bpResult = await homeHealthRepository.createBpRecords([bpRecord]);
+//     if (bpResult.error) throw bpResult.error;
+
+//     const factsResult = await homeHealthRepository.replaceClinicalFacts({
+//       userId: input.userId,
+//       groups: [...FACT_GROUPS],
+//       facts: clinicalFacts,
+//     });
+//     if (factsResult.error) throw factsResult.error;
+
+//     return {
+//       bpRecords: bpResult.data ?? [],
+//       clinicalFacts: factsResult.data ?? [],
+//     };
+//   },
+// };
+
+import {
+  HEALTH_RISK_GROUPS,
+  type BpRecordInsert,
+  type BpRecordUpdate,
+  type ClinicalFactInsert,
+  type HealthDataSource,
+} from "@/src/config/supabaseApi";
 import {
   homeHealthRepository,
   type BpRecord,
   type ClinicalFact,
-} from '@/src/repositories/home-health.repository';
-import type {
-  BpRecordInsert,
-  ClinicalFactInsert,
-  HealthDataSource,
-} from '@/src/config/supabaseApi';
+} from "@/src/repositories/home-health.repository";
 
-export type BpSource = 'HBPM' | 'OBPM' | 'ABPM';
-export type DayPeriod = 'morning' | 'afternoon' | 'evening' | 'night';
-export type PositionType = 'sitting' | 'standing' | 'lying';
-export type DeviceType = 'upper_arm' | 'wrist';
+export type BpSource = "HBPM" | "OBPM" | "ABPM";
+export type DayPeriod = "morning" | "afternoon" | "evening" | "night";
+export type PositionType = "sitting" | "standing" | "lying";
+export type DeviceType = "upper_arm" | "wrist";
 
-export interface HomeHealthFormInput {
+export interface BpRecordFormInput {
   userId: string;
   systolic: string;
   diastolic: string;
@@ -25,25 +243,32 @@ export interface HomeHealthFormInput {
   deviceType: DeviceType;
   deviceValidated: boolean;
   measuredAt: string;
+}
+
+export interface UpdateBpRecordInput {
+  recordId: string;
+  systolic: string;
+  diastolic: string;
+  bpSource: BpSource;
+  dayPeriod: DayPeriod;
+  position: PositionType;
+  restedMinutes: string;
+  deviceType: DeviceType;
+  deviceValidated: boolean;
+}
+
+export interface RiskProfileInput {
+  userId: string;
   riskFactors: string[];
   hmodItems: string[];
   cardiovascularDiseases: string[];
-  symptoms: string[];
-  medications: string[];
   source: HealthDataSource | string;
 }
-
-const FACT_GROUPS = [
-  'risk_factors',
-  'hmod',
-  'cardiovascular_disease',
-  'symptoms',
-  'medications',
-] as const;
 
 function parseOptionalNumber(value: string): number | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
+
   const parsed = Number(trimmed);
   return Number.isNaN(parsed) ? null : parsed;
 }
@@ -51,8 +276,10 @@ function parseOptionalNumber(value: string): number | null {
 function toIsoOrNow(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return new Date().toISOString();
+
   const date = new Date(trimmed);
   if (Number.isNaN(date.getTime())) return new Date().toISOString();
+
   return date.toISOString();
 }
 
@@ -61,70 +288,76 @@ function uniqueStrings(values: string[]): string[] {
 }
 
 export const homeHealthService = {
-  getSeverityFromBp(systolic: number, diastolic: number): string {
-    if (systolic > 180 || diastolic > 120) return 'crisis';
-    if (systolic >= 140 || diastolic >= 90) return 'stage_2';
-    if (systolic >= 130 || diastolic >= 80) return 'stage_1';
-    if (systolic >= 120 && diastolic < 80) return 'elevated';
-    if (systolic < 90 || diastolic < 60) return 'low';
-    return 'normal';
-  },
-
-  validateInput(input: HomeHealthFormInput): string | null {
+  validateBpInput(
+    input: Pick<BpRecordFormInput, "systolic" | "diastolic">,
+  ): string | null {
     if (!input.systolic.trim() || !input.diastolic.trim()) {
-      return 'Vui lòng nhập đầy đủ huyết áp tâm thu và tâm trương';
+      return "Vui lòng nhập đầy đủ huyết áp tâm thu và tâm trương";
     }
 
     const systolic = Number(input.systolic);
     const diastolic = Number(input.diastolic);
 
     if (Number.isNaN(systolic) || Number.isNaN(diastolic)) {
-      return 'Giá trị huyết áp phải là số hợp lệ';
+      return "Giá trị huyết áp phải là số hợp lệ";
     }
 
     if (systolic < 40 || systolic > 300) {
-      return 'Huyết áp tâm thu nằm ngoài khoảng hợp lý';
+      return "Huyết áp tâm thu nằm ngoài khoảng hợp lý";
     }
 
     if (diastolic < 30 || diastolic > 200) {
-      return 'Huyết áp tâm trương nằm ngoài khoảng hợp lý';
+      return "Huyết áp tâm trương nằm ngoài khoảng hợp lý";
+    }
+
+    if (systolic <= diastolic) {
+      return "Huyết áp tâm thu phải lớn hơn huyết áp tâm trương";
     }
 
     return null;
   },
 
-  buildBpRecord(input: HomeHealthFormInput): BpRecordInsert {
-    const systolic = Number(input.systolic);
-    const diastolic = Number(input.diastolic);
-
+  buildBpRecord(input: BpRecordFormInput): BpRecordInsert {
     return {
       user_id: input.userId,
-      systolic,
-      diastolic,
+      systolic: Number(input.systolic),
+      diastolic: Number(input.diastolic),
       source: input.bpSource,
       day_period: input.dayPeriod,
       position: input.position,
       rested_minutes: parseOptionalNumber(input.restedMinutes),
       device_type: input.deviceType,
       device_validated: input.deviceValidated,
-      status: 'accepted',
-      severity: this.getSeverityFromBp(systolic, diastolic),
+      status: "accepted",
       created_at: toIsoOrNow(input.measuredAt),
     };
   },
 
-  buildClinicalFacts(input: HomeHealthFormInput): ClinicalFactInsert[] {
+  buildBpRecordUpdate(input: UpdateBpRecordInput): BpRecordUpdate {
+    return {
+      systolic: Number(input.systolic),
+      diastolic: Number(input.diastolic),
+      source: input.bpSource,
+      day_period: input.dayPeriod,
+      position: input.position,
+      rested_minutes: parseOptionalNumber(input.restedMinutes),
+      device_type: input.deviceType,
+      device_validated: input.deviceValidated,
+      status: "accepted",
+    };
+  },
+
+  buildRiskProfileFacts(input: RiskProfileInput): ClinicalFactInsert[] {
     const rows: ClinicalFactInsert[] = [];
     const now = new Date().toISOString();
 
     uniqueStrings(input.riskFactors).forEach((factKey) => {
       rows.push({
         user_id: input.userId,
-        fact_group: 'risk_factors',
+        fact_group: "risk_factors",
         fact_key: factKey,
         value: true,
-        status: 'accepted',
-        severity: null,
+        status: "accepted",
         source: input.source,
         updated_at: now,
       });
@@ -133,11 +366,10 @@ export const homeHealthService = {
     uniqueStrings(input.hmodItems).forEach((factKey) => {
       rows.push({
         user_id: input.userId,
-        fact_group: 'hmod',
+        fact_group: "hmod",
         fact_key: factKey,
         value: true,
-        status: 'accepted',
-        severity: null,
+        status: "accepted",
         source: input.source,
         updated_at: now,
       });
@@ -146,37 +378,10 @@ export const homeHealthService = {
     uniqueStrings(input.cardiovascularDiseases).forEach((factKey) => {
       rows.push({
         user_id: input.userId,
-        fact_group: 'cardiovascular_disease',
+        fact_group: "cardiovascular_disease",
         fact_key: factKey,
         value: true,
-        status: 'accepted',
-        severity: null,
-        source: input.source,
-        updated_at: now,
-      });
-    });
-
-    uniqueStrings(input.symptoms).forEach((factKey) => {
-      rows.push({
-        user_id: input.userId,
-        fact_group: 'symptoms',
-        fact_key: factKey,
-        value: true,
-        status: 'accepted',
-        severity: null,
-        source: input.source,
-        updated_at: now,
-      });
-    });
-
-    uniqueStrings(input.medications).forEach((factKey) => {
-      rows.push({
-        user_id: input.userId,
-        fact_group: 'medications',
-        fact_key: factKey,
-        value: true,
-        status: 'accepted',
-        severity: null,
+        status: "accepted",
         source: input.source,
         updated_at: now,
       });
@@ -185,31 +390,84 @@ export const homeHealthService = {
     return rows;
   },
 
-  async submitSimpleForm(input: HomeHealthFormInput): Promise<{
-    bpRecords: BpRecord[];
-    clinicalFacts: ClinicalFact[];
-  }> {
-    const validationError = this.validateInput(input);
+  async createBpRecord(input: BpRecordFormInput): Promise<BpRecord> {
+    const validationError = this.validateBpInput(input);
     if (validationError) {
       throw new Error(validationError);
     }
 
-    const bpRecord = this.buildBpRecord(input);
-    const clinicalFacts = this.buildClinicalFacts(input);
+    const payload = this.buildBpRecord(input);
+    const result = await homeHealthRepository.createBpRecord(payload);
 
-    const bpResult = await homeHealthRepository.createBpRecords([bpRecord]);
-    if (bpResult.error) throw bpResult.error;
+    if (result.error) throw result.error;
+    if (!result.data) throw new Error("Không thể tạo bản ghi huyết áp");
 
-    const factsResult = await homeHealthRepository.replaceClinicalFacts({
+    return result.data;
+  },
+
+  async updateBpRecord(input: UpdateBpRecordInput): Promise<BpRecord> {
+    const validationError = this.validateBpInput(input);
+    if (validationError) {
+      throw new Error(validationError);
+    }
+
+    const payload = this.buildBpRecordUpdate(input);
+    const result = await homeHealthRepository.updateBpRecord(
+      input.recordId,
+      payload,
+    );
+
+    if (result.error) throw result.error;
+    if (!result.data) throw new Error("Không thể cập nhật bản ghi huyết áp");
+
+    return result.data;
+  },
+
+  async deleteBpRecord(recordId: string): Promise<void> {
+    const result = await homeHealthRepository.deleteBpRecord(recordId);
+    if (result.error) throw result.error;
+  },
+
+  async getBpRecordById(recordId: string): Promise<BpRecord> {
+    const result = await homeHealthRepository.findBpRecordById(recordId);
+
+    if (result.error) throw result.error;
+    if (!result.data) throw new Error("Không tìm thấy bản ghi huyết áp");
+
+    return result.data;
+  },
+
+  async getBpRecordsByDateRange(input: {
+    userId: string;
+    fromDate?: string | null;
+    toDate?: string | null;
+  }): Promise<BpRecord[]> {
+    const result = await homeHealthRepository.findBpRecordsByDateRange(input);
+
+    if (result.error) throw result.error;
+    return result.data ?? [];
+  },
+
+  async getRiskProfile(userId: string): Promise<ClinicalFact[]> {
+    const result = await homeHealthRepository.findClinicalFactsByUserId(
+      userId,
+      [...HEALTH_RISK_GROUPS],
+    );
+
+    if (result.error) throw result.error;
+    return result.data ?? [];
+  },
+
+  async saveRiskProfile(input: RiskProfileInput): Promise<ClinicalFact[]> {
+    const facts = this.buildRiskProfileFacts(input);
+
+    const result = await homeHealthRepository.replaceClinicalFacts({
       userId: input.userId,
-      groups: [...FACT_GROUPS],
-      facts: clinicalFacts,
+      groups: [...HEALTH_RISK_GROUPS],
+      facts,
     });
-    if (factsResult.error) throw factsResult.error;
 
-    return {
-      bpRecords: bpResult.data ?? [],
-      clinicalFacts: factsResult.data ?? [],
-    };
+    if (result.error) throw result.error;
+    return result.data ?? [];
   },
 };
