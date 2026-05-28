@@ -25,6 +25,8 @@ const INTENT_OPTIONS: { value: IntentMode; label: string; icon: string }[] = [
   { value: "data_collection", label: "Ghi nhận dữ liệu sức khỏe", icon: "database-plus" },
 ];
 
+const TAB_BAR_HEIGHT = 64;
+
 const COLORS = {
   background: "#F3F7F7",
   surface: "#FCFEFE",
@@ -207,7 +209,7 @@ export default function BotScreen() {
           </View>
         )}
 
-        <View style={styles.composerArea}>
+        <View style={[styles.composerArea, { marginBottom: TAB_BAR_HEIGHT }]}>
           {intentMenuVisible && <IntentMenu value={intentMode} onSelect={selectIntent} />}
           <View
             style={[
@@ -236,17 +238,15 @@ export default function BotScreen() {
               multiline
               editable={!isLoading}
             />
-            <TouchableOpacity
-              style={[styles.sendButton, !inputMessage.trim() && styles.sendButtonDisabled]}
-              onPress={submitMessage}
-              disabled={isLoading || !inputMessage.trim()}
-            >
-              <MaterialCommunityIcons
-                name="send"
-                size={20}
-                color={isLoading || !inputMessage.trim() ? COLORS.textMuted : COLORS.white}
-              />
-            </TouchableOpacity>
+            {!!inputMessage.trim() && (
+              <TouchableOpacity
+                style={styles.sendButton}
+                onPress={submitMessage}
+                disabled={isLoading}
+              >
+                <MaterialCommunityIcons name="arrow-up" size={21} color={COLORS.white} />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -374,12 +374,11 @@ const styles = StyleSheet.create({
   loadingContainer: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
   loadingText: { color: COLORS.primary, fontSize: 14, fontWeight: "700" },
   composerArea: { backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
-  inputContainer: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14, backgroundColor: COLORS.surface, gap: 10 },
-  intentButton: { width: 44, height: 44, borderRadius: 16, backgroundColor: COLORS.surfaceSoft, borderWidth: 1, borderColor: COLORS.border, justifyContent: "center", alignItems: "center" },
+  inputContainer: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12, backgroundColor: COLORS.surface, gap: 10 },
+  intentButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.surfaceSoft, borderWidth: 1, borderColor: COLORS.border, justifyContent: "center", alignItems: "center" },
   intentButtonActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  input: { flex: 1, backgroundColor: COLORS.surfaceSoft, borderRadius: 18, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 16, paddingVertical: 11, fontSize: 15, color: COLORS.text, maxHeight: 100 },
-  sendButton: { width: 44, height: 44, borderRadius: 16, backgroundColor: COLORS.primary, justifyContent: "center", alignItems: "center" },
-  sendButtonDisabled: { backgroundColor: COLORS.surfaceStrong },
+  input: { flex: 1, minHeight: 44, backgroundColor: COLORS.surfaceSoft, borderRadius: 22, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 16, paddingVertical: 11, fontSize: 15, color: COLORS.text, maxHeight: 100 },
+  sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, justifyContent: "center", alignItems: "center" },
   sidebarOverlay: { position: "absolute", left: 0, top: 0, right: 0, bottom: 0, backgroundColor: "rgba(0, 0, 0, 0.5)", zIndex: 99 },
   sidebar: { position: "absolute", left: 0, top: 0, bottom: 0, width: 260, backgroundColor: COLORS.surface, zIndex: 101 },
   sidebarHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 16, paddingTop: 50, borderBottomWidth: 1, borderBottomColor: COLORS.border },
