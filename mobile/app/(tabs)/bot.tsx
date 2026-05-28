@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/src/contexts/auth-context";
 import { HealthProposalConfirmation } from "@/src/features/chatbot/components/HealthProposalConfirmation";
@@ -47,31 +48,39 @@ function IntentSelector({
   onChange: (value: IntentMode) => void;
 }) {
   return (
-    <View style={intentStyles.row}>
-      {INTENT_OPTIONS.map((option) => {
-        const active = value === option.value;
-        return (
-          <TouchableOpacity
-            key={option.value}
-            style={[intentStyles.chip, active && intentStyles.chipActive]}
-            onPress={() => onChange(option.value)}
-          >
-            <MaterialCommunityIcons
-              name={option.icon as never}
-              size={13}
-              color={active ? COLORS.white : COLORS.primaryDark}
-            />
-            <Text style={[intentStyles.chipText, active && intentStyles.chipTextActive]}>
-              {option.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+    <View style={intentStyles.container}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={intentStyles.row}
+      >
+        {INTENT_OPTIONS.map((option) => {
+          const active = value === option.value;
+          return (
+            <TouchableOpacity
+              key={option.value}
+              style={[intentStyles.chip, active && intentStyles.chipActive]}
+              onPress={() => onChange(option.value)}
+            >
+              <MaterialCommunityIcons
+                name={option.icon as never}
+                size={13}
+                color={active ? COLORS.white : COLORS.primaryDark}
+              />
+              <Text style={[intentStyles.chipText, active && intentStyles.chipTextActive]}>
+                {option.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 }
 
 export default function BotScreen() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const {
     messages,
@@ -192,7 +201,12 @@ export default function BotScreen() {
         )}
 
         <IntentSelector value={intentMode} onChange={setIntentMode} />
-        <View style={styles.inputContainer}>
+        <View
+          style={[
+            styles.inputContainer,
+            { paddingBottom: Math.max(insets.bottom, 10) },
+          ]}
+        >
           <TextInput
             style={styles.input}
             placeholder="Nhập tin nhắn hoặc dữ liệu sức khỏe..."
@@ -267,16 +281,17 @@ export default function BotScreen() {
 }
 
 const intentStyles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
+  container: {
     backgroundColor: COLORS.surface,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+  },
+  row: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 8,
   },
   chip: {
     flexDirection: "row",
