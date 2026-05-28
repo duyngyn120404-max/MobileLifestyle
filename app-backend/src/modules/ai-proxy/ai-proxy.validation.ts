@@ -13,6 +13,7 @@ import type {
 } from "./ai-proxy.types.js";
 
 const INTENT_MODES: IntentMode[] = [
+  "auto",
   "personal_medical_qa",
   "general_medical_qa",
   "data_collection",

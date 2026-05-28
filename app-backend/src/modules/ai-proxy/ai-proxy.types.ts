@@ -1,4 +1,5 @@
 export type IntentMode =
+  | "auto"
   | "personal_medical_qa"
   | "general_medical_qa"
   | "data_collection";

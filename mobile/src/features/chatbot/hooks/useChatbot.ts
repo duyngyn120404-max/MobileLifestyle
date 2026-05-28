@@ -33,7 +33,7 @@ export function useChatbot() {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [selectedConversationId, setSelectedConversationId] = useState("current");
   const [inputMessage, setInputMessage] = useState("");
-  const [intentMode, setIntentMode] = useState<IntentMode>("data_collection");
+  const [intentMode, setIntentMode] = useState<IntentMode>("auto");
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,7 +135,7 @@ export function useChatbot() {
       const result = await aiProxyClient.submitInteraction(conversationId, {
         type: "user_message",
         content,
-        intent: intentMode,
+        ...(intentMode === "auto" ? {} : { intent: intentMode }),
       });
       const agentMessages = result.messages.filter((message) => message.role === "assistant");
       setMessages((previous) => [...previous, ...agentMessages.map(mapMessage)]);

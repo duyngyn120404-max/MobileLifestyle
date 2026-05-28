@@ -18,6 +18,7 @@ import { useChatbot } from "@/src/features/chatbot/hooks/useChatbot";
 import type { ChatMessage, IntentMode } from "@/src/features/chatbot/types/chatbot.types";
 
 const INTENT_OPTIONS: { value: IntentMode; label: string; icon: string }[] = [
+  { value: "auto", label: "Tự động", icon: "auto-fix" },
   { value: "personal_medical_qa", label: "Cá nhân", icon: "account-heart" },
   { value: "general_medical_qa", label: "Tổng quát", icon: "stethoscope" },
   { value: "data_collection", label: "Ghi nhận", icon: "database-plus" },

@@ -129,7 +129,9 @@ export function toAiServiceInteractionRequest(
     return {
       type: "user_message",
       content: request.content,
-      ...(request.intent === undefined ? {} : { intent: request.intent }),
+      ...(request.intent === undefined || request.intent === "auto"
+        ? {}
+        : { intent: request.intent }),
     };
   }
   return {
