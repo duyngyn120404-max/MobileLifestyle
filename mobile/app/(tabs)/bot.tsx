@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
@@ -19,10 +19,10 @@ import { useChatbot } from "@/src/features/chatbot/hooks/useChatbot";
 import type { ChatMessage, IntentMode } from "@/src/features/chatbot/types/chatbot.types";
 
 const INTENT_OPTIONS: { value: IntentMode; label: string; icon: string }[] = [
-  { value: "auto", label: "Tự động", icon: "auto-fix" },
-  { value: "personal_medical_qa", label: "Cá nhân", icon: "account-heart" },
-  { value: "general_medical_qa", label: "Tổng quát", icon: "stethoscope" },
-  { value: "data_collection", label: "Ghi nhận", icon: "database-plus" },
+  { value: "auto", label: "Tự động chọn chế độ", icon: "auto-fix" },
+  { value: "personal_medical_qa", label: "Tư vấn theo hồ sơ của tôi", icon: "account-heart" },
+  { value: "general_medical_qa", label: "Hỏi kiến thức sức khỏe", icon: "stethoscope" },
+  { value: "data_collection", label: "Ghi nhận dữ liệu sức khỏe", icon: "database-plus" },
 ];
 
 const COLORS = {
@@ -40,47 +40,44 @@ const COLORS = {
   white: "#FFFFFF",
 };
 
-function IntentSelector({
+function IntentMenu({
   value,
-  onChange,
+  onSelect,
 }: {
   value: IntentMode;
-  onChange: (value: IntentMode) => void;
+  onSelect: (value: IntentMode) => void;
 }) {
   return (
-    <View style={intentStyles.container}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={intentStyles.row}
-      >
-        {INTENT_OPTIONS.map((option) => {
-          const active = value === option.value;
-          return (
-            <TouchableOpacity
-              key={option.value}
-              style={[intentStyles.chip, active && intentStyles.chipActive]}
-              onPress={() => onChange(option.value)}
-            >
-              <MaterialCommunityIcons
-                name={option.icon as never}
-                size={13}
-                color={active ? COLORS.white : COLORS.primaryDark}
-              />
-              <Text style={[intentStyles.chipText, active && intentStyles.chipTextActive]}>
-                {option.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+    <View style={intentStyles.popup}>
+      {INTENT_OPTIONS.map((option) => {
+        const active = value === option.value;
+        return (
+          <TouchableOpacity
+            key={option.value}
+            style={[intentStyles.option, active && intentStyles.optionActive]}
+            onPress={() => onSelect(option.value)}
+          >
+            <MaterialCommunityIcons
+              name={option.icon as never}
+              size={18}
+              color={active ? COLORS.primary : COLORS.textMuted}
+            />
+            <Text style={[intentStyles.optionText, active && intentStyles.optionTextActive]}>
+              {option.label}
+            </Text>
+            {active && (
+              <MaterialCommunityIcons name="check" size={17} color={COLORS.primary} />
+            )}
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
 
 export default function BotScreen() {
   const insets = useSafeAreaInsets();
+  const [intentMenuVisible, setIntentMenuVisible] = useState(false);
   const { user } = useAuth();
   const {
     messages,
@@ -106,6 +103,16 @@ export default function BotScreen() {
   useEffect(() => {
     if (user?.id) void loadConversations();
   }, [loadConversations, user?.id]);
+
+  const selectIntent = (value: IntentMode) => {
+    setIntentMode(value);
+    setIntentMenuVisible(false);
+  };
+
+  const submitMessage = () => {
+    setIntentMenuVisible(false);
+    void sendMessage();
+  };
 
   const renderMessage = ({ item }: { item: ChatMessage }) => {
     const isUser = item.role === "user";
@@ -200,33 +207,47 @@ export default function BotScreen() {
           </View>
         )}
 
-        <IntentSelector value={intentMode} onChange={setIntentMode} />
-        <View
-          style={[
-            styles.inputContainer,
-            { paddingBottom: Math.max(insets.bottom, 10) },
-          ]}
-        >
-          <TextInput
-            style={styles.input}
-            placeholder="Nhập tin nhắn hoặc dữ liệu sức khỏe..."
-            placeholderTextColor={COLORS.textMuted}
-            value={inputMessage}
-            onChangeText={setInputMessage}
-            multiline
-            editable={!isLoading}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, !inputMessage.trim() && styles.sendButtonDisabled]}
-            onPress={() => void sendMessage()}
-            disabled={isLoading || !inputMessage.trim()}
+        <View style={styles.composerArea}>
+          {intentMenuVisible && <IntentMenu value={intentMode} onSelect={selectIntent} />}
+          <View
+            style={[
+              styles.inputContainer,
+              { paddingBottom: Math.max(insets.bottom, 10) },
+            ]}
           >
-            <MaterialCommunityIcons
-              name="send"
-              size={20}
-              color={isLoading || !inputMessage.trim() ? COLORS.textMuted : COLORS.white}
+            <TouchableOpacity
+              style={[styles.intentButton, intentMenuVisible && styles.intentButtonActive]}
+              onPress={() => setIntentMenuVisible((visible) => !visible)}
+              accessibilityLabel="Chọn intent"
+            >
+              <MaterialCommunityIcons
+                name="plus"
+                size={24}
+                color={intentMenuVisible ? COLORS.white : COLORS.primary}
+              />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.input}
+              placeholder="Nhập tin nhắn hoặc dữ liệu sức khỏe..."
+              placeholderTextColor={COLORS.textMuted}
+              value={inputMessage}
+              onChangeText={setInputMessage}
+              onFocus={() => setIntentMenuVisible(false)}
+              multiline
+              editable={!isLoading}
             />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sendButton, !inputMessage.trim() && styles.sendButtonDisabled]}
+              onPress={submitMessage}
+              disabled={isLoading || !inputMessage.trim()}
+            >
+              <MaterialCommunityIcons
+                name="send"
+                size={20}
+                color={isLoading || !inputMessage.trim() ? COLORS.textMuted : COLORS.white}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -281,32 +302,27 @@ export default function BotScreen() {
 }
 
 const intentStyles = StyleSheet.create({
-  container: {
+  popup: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 2,
+    padding: 6,
+    borderRadius: 16,
     backgroundColor: COLORS.surface,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 8,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 14,
-    backgroundColor: COLORS.surfaceSoft,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  chipText: { fontSize: 12, color: COLORS.primaryDark, fontWeight: "700" },
-  chipTextActive: { color: COLORS.white },
+  option: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minHeight: 42,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  optionActive: { backgroundColor: COLORS.surfaceSoft },
+  optionText: { flex: 1, fontSize: 14, color: COLORS.text, fontWeight: "700" },
+  optionTextActive: { color: COLORS.primaryDark },
 });
 
 const styles = StyleSheet.create({
@@ -357,7 +373,10 @@ const styles = StyleSheet.create({
   errorText: { color: COLORS.danger, fontSize: 13, paddingHorizontal: 16, paddingVertical: 8, fontWeight: "600" },
   loadingContainer: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 14, gap: 10 },
   loadingText: { color: COLORS.primary, fontSize: 14, fontWeight: "700" },
-  inputContainer: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 16, paddingVertical: 14, backgroundColor: COLORS.surface, gap: 10 },
+  composerArea: { backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
+  inputContainer: { flexDirection: "row", alignItems: "flex-end", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14, backgroundColor: COLORS.surface, gap: 10 },
+  intentButton: { width: 44, height: 44, borderRadius: 16, backgroundColor: COLORS.surfaceSoft, borderWidth: 1, borderColor: COLORS.border, justifyContent: "center", alignItems: "center" },
+  intentButtonActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
   input: { flex: 1, backgroundColor: COLORS.surfaceSoft, borderRadius: 18, borderWidth: 1, borderColor: COLORS.border, paddingHorizontal: 16, paddingVertical: 11, fontSize: 15, color: COLORS.text, maxHeight: 100 },
   sendButton: { width: 44, height: 44, borderRadius: 16, backgroundColor: COLORS.primary, justifyContent: "center", alignItems: "center" },
   sendButtonDisabled: { backgroundColor: COLORS.surfaceStrong },
