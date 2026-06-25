@@ -47,6 +47,15 @@ const actions = [
     accent: "#E7F1F2",
     onPress: () => router.push("/(health)/risk-profile"),
   },
+  {
+    key: "reports",
+    title: "Báo cáo huyết áp",
+    subtitle:
+      "Xem danh sách báo cáo theo tuần, lọc thời gian và mở chi tiết phân tích.",
+    icon: "file-chart-outline" as const,
+    accent: "#EAF2FF",
+    onPress: () => router.push("/(health)/reports"),
+  },
 ];
 
 export default function HomeScreen() {
@@ -120,9 +129,7 @@ export default function HomeScreen() {
 
           <Text style={styles.heroEyebrow}>{greeting}</Text>
 
-          <Text style={styles.heroTitle}>
-            Quản lý sức khỏe
-          </Text>
+          <Text style={styles.heroTitle}>Quản lý sức khỏe của {displayName}</Text>
 
           <Text style={styles.heroSubtitle}>
             Chọn nhóm chức năng bạn cần thao tác để tiếp
@@ -186,14 +193,10 @@ export default function HomeScreen() {
                         </View>
 
                         <Text style={styles.featureTitle}>{item.title}</Text>
-                        <Text style={styles.featureSubtitle}>
-                          {item.subtitle}
-                        </Text>
+                        <Text style={styles.featureSubtitle}>{item.subtitle}</Text>
 
                         <View style={styles.featureFooter}>
-                          <Text style={styles.featureFooterText}>
-                            Mở màn hình
-                          </Text>
+                          <Text style={styles.featureFooterText}>Mở màn hình</Text>
                           <MaterialCommunityIcons
                             name="arrow-top-right"
                             size={16}

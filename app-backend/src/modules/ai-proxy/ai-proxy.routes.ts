@@ -5,18 +5,24 @@ import { asyncHandler } from "../../middlewares/async-handler.js";
 import {
   createBpRecord,
   createConversation,
+  createMeasurementSession,
   deleteBpRecord,
+  deleteMeasurementSession,
   deleteConversation,
   getBpRecord,
   getRiskProfile,
   getLatestReport,
   generateReport,
+  getMeasurementSession,
+  listReports,
   listBpRecords,
+  listMeasurementSessions,
   listConversations,
   listMessages,
   saveRiskProfile,
   submitInteraction,
   updateBpRecord,
+  updateMeasurementSession,
 } from "./ai-proxy.controller.js";
 
 export const aiProxyRoutes = Router();
@@ -32,7 +38,13 @@ aiProxyRoutes.get("/health-data/bp-records/:recordId", asyncHandler(getBpRecord)
 aiProxyRoutes.post("/health-data/bp-records", asyncHandler(createBpRecord));
 aiProxyRoutes.patch("/health-data/bp-records/:recordId", asyncHandler(updateBpRecord));
 aiProxyRoutes.delete("/health-data/bp-records/:recordId", asyncHandler(deleteBpRecord));
+aiProxyRoutes.get("/health-data/measurement-sessions", asyncHandler(listMeasurementSessions));
+aiProxyRoutes.get("/health-data/measurement-sessions/:sessionId", asyncHandler(getMeasurementSession));
+aiProxyRoutes.post("/health-data/measurement-sessions", asyncHandler(createMeasurementSession));
+aiProxyRoutes.patch("/health-data/measurement-sessions/:sessionId", asyncHandler(updateMeasurementSession));
+aiProxyRoutes.delete("/health-data/measurement-sessions/:sessionId", asyncHandler(deleteMeasurementSession));
 aiProxyRoutes.get("/health-data/risk-profile", asyncHandler(getRiskProfile));
 aiProxyRoutes.put("/health-data/risk-profile", asyncHandler(saveRiskProfile));
+aiProxyRoutes.get("/reports", asyncHandler(listReports));
 aiProxyRoutes.get("/reports/latest", asyncHandler(getLatestReport));
 aiProxyRoutes.post("/reports", asyncHandler(generateReport));

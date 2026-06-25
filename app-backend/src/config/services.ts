@@ -5,6 +5,9 @@ export const services = {
     url: env.supabaseUrl,
     anonKey: env.supabaseAnonKey,
   },
+  odooWebhook: {
+    apiKey: env.odooWebhookApiKey,
+  },
   aiService: {
     baseUrl: env.aiServiceBaseUrl,
     apiKey: env.aiServiceApiKey,

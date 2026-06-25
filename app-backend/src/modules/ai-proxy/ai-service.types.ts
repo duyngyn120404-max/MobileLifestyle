@@ -64,8 +64,52 @@ export interface AiServiceSaveBpRecordRequest {
   measuredAt: string;
 }
 
-export interface AiServiceBpRecordResponse extends AiServiceSaveBpRecordRequest {
+export interface AiServiceBpRecordResponse {
   id: string;
+  systolic: number;
+  diastolic: number;
+  source: string | null;
+  dayPeriod: string | null;
+  position: string | null;
+  restedMinutes: number | null;
+  deviceType: string | null;
+  deviceValidated: boolean | null;
+  measuredAt: string;
+  warnings?: string[];
+}
+
+
+export interface AiServiceSaveBpReadingRequest {
+  systolic: number;
+  diastolic: number;
+}
+
+export interface AiServiceBpReadingResponse extends AiServiceSaveBpReadingRequest {
+  id?: string | null;
+  order: number;
+}
+
+export interface AiServiceSaveMeasurementSessionRequest {
+  measuredAt: string;
+  source: AiServiceBpSource;
+  position: AiServicePositionType;
+  restedMinutes: number | null;
+  deviceType: AiServiceDeviceType;
+  deviceValidated: boolean;
+  readings: AiServiceSaveBpReadingRequest[];
+}
+
+export interface AiServiceMeasurementSessionResponse {
+  id: string;
+  measuredAt: string;
+  measuredDate: string;
+  dayPeriod: string;
+  source: string | null;
+  position: string | null;
+  restedMinutes: number | null;
+  deviceType: string | null;
+  deviceValidated: boolean | null;
+  readings: AiServiceBpReadingResponse[];
   warnings?: string[];
 }
 
@@ -81,9 +125,9 @@ export interface AiServiceRiskProfileResponse extends AiServiceSaveRiskProfileRe
 
 export interface AiServiceMeasurementQualityItem {
   source: string;
-  qualityScore: number;
-  qualityLevel: "high" | "medium" | "low";
-  usable: boolean;
+  qualityScore: number | null;
+  qualityLevel: "high" | "medium" | "low" | null;
+  usable: boolean | null;
   flags: string[];
 }
 
@@ -101,11 +145,7 @@ export interface AiServiceBpAverages {
 export interface AiServiceReportClassification {
   bpCategory?: "normal" | "elevated" | "hypertension";
   bpStage?: string;
-  phenotype?:
-    | "sustained_hypertension"
-    | "white_coat_hypertension"
-    | "masked_hypertension"
-    | "normal";
+  phenotype?: string;
   sourceUsed?: string;
   confidence?: "high" | "medium" | "low";
   dataSource?: "live" | "stored";
@@ -130,6 +170,11 @@ export interface AiServiceReportMlRisk {
 }
 
 export interface AiServiceHealthReport {
+  id?: string | null;
+  weekStart?: string | null;
+  weekEnd?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   classification: AiServiceReportClassification;
   clinicalReasoning?: {
     explanation?: string;
@@ -144,6 +189,10 @@ export interface AiServiceHealthReport {
 
 export interface AiServiceLatestReportResponse {
   report: AiServiceHealthReport | null;
+}
+
+export interface AiServiceReportsListResponse {
+  reports: AiServiceHealthReport[];
 }
 
 export interface AiServiceGenerateReportResponse {

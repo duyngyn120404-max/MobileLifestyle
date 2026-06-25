@@ -27,6 +27,20 @@ function mapMessage(message: ChatMessageDto): ChatMessage {
   };
 }
 
+function appendUniqueMessages(
+  currentMessages: ChatMessage[],
+  newMessages: ChatMessage[],
+): ChatMessage[] {
+  const existingIds = new Set(currentMessages.map((message) => message.id));
+  const uniqueMessages = newMessages.filter((message) => {
+    if (existingIds.has(message.id)) return false;
+    existingIds.add(message.id);
+    return true;
+  });
+
+  return [...currentMessages, ...uniqueMessages];
+}
+
 export function useChatbot() {
   const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage()]);
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -35,11 +49,19 @@ export function useChatbot() {
   const [inputMessage, setInputMessage] = useState("");
   const [intentMode, setIntentMode] = useState<IntentMode>("auto");
   const [sidebarVisible, setSidebarVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isRespondingToAction, setIsRespondingToAction] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [processingActionId, setProcessingActionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const isComposerDisabled = isSendingMessage || isLoadingMessages || isRespondingToAction;
+  const isBotThinking = isSendingMessage;
 
   const loadConversations = useCallback(async () => {
     try {
+      setIsLoadingConversations(true);
       setError(null);
       const conversations = await aiProxyClient.listConversations();
       setChatSessions(
@@ -51,6 +73,8 @@ export function useChatbot() {
       );
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Không thể tải hội thoại.");
+    } finally {
+      setIsLoadingConversations(false);
     }
   }, []);
 
@@ -65,7 +89,7 @@ export function useChatbot() {
     }
 
     setCurrentConversationId(conversationId);
-    setIsLoading(true);
+    setIsLoadingMessages(true);
     setError(null);
     try {
       const history = await aiProxyClient.listMessages(conversationId);
@@ -76,7 +100,7 @@ export function useChatbot() {
       setError(message);
       Alert.alert("Lỗi", message);
     } finally {
-      setIsLoading(false);
+      setIsLoadingMessages(false);
     }
   }, []);
 
@@ -99,7 +123,7 @@ export function useChatbot() {
 
   const sendMessage = useCallback(async () => {
     const content = inputMessage.trim();
-    if (!content || isLoading) return;
+    if (!content || isComposerDisabled) return;
 
     setInputMessage("");
     setError(null);
@@ -113,7 +137,7 @@ export function useChatbot() {
         timestamp: new Date(),
       },
     ]);
-    setIsLoading(true);
+    setIsSendingMessage(true);
 
     try {
       let conversationId = currentConversationId;
@@ -138,7 +162,7 @@ export function useChatbot() {
         ...(intentMode === "auto" ? {} : { intent: intentMode }),
       });
       const agentMessages = result.messages.filter((message) => message.role === "assistant");
-      setMessages((previous) => [...previous, ...agentMessages.map(mapMessage)]);
+      setMessages((previous) => appendUniqueMessages(previous, agentMessages.map(mapMessage)));
     } catch (sendError) {
       const message = sendError instanceof Error ? sendError.message : "Không thể gửi tin nhắn.";
       setError(message);
@@ -153,17 +177,19 @@ export function useChatbot() {
         },
       ]);
     } finally {
-      setIsLoading(false);
+      setIsSendingMessage(false);
     }
-  }, [currentConversationId, inputMessage, intentMode, isLoading]);
+  }, [currentConversationId, inputMessage, intentMode, isComposerDisabled]);
 
   const respondToAction = useCallback(async (
     actionId: string,
     decision: "accepted" | "rejected",
   ) => {
     if (!currentConversationId) return;
+    if (isRespondingToAction) return;
 
-    setIsLoading(true);
+    setIsRespondingToAction(true);
+    setProcessingActionId(actionId);
     setError(null);
     try {
       const result = await aiProxyClient.submitInteraction(currentConversationId, {
@@ -179,18 +205,21 @@ export function useChatbot() {
           ),
         })),
       );
-      setMessages((previous) => [
-        ...previous,
-        ...result.messages.filter((message) => message.role === "assistant").map(mapMessage),
-      ]);
+      setMessages((previous) =>
+        appendUniqueMessages(
+          previous,
+          result.messages.filter((message) => message.role === "assistant").map(mapMessage),
+        ),
+      );
     } catch (actionError) {
       const message = actionError instanceof Error ? actionError.message : "Không thể xác nhận dữ liệu.";
       setError(message);
       Alert.alert("Lỗi", message);
     } finally {
-      setIsLoading(false);
+      setIsRespondingToAction(false);
+      setProcessingActionId(null);
     }
-  }, [currentConversationId]);
+  }, [currentConversationId, isRespondingToAction]);
 
   const likeMessage = useCallback((messageId: string) => {
     setMessages((previous) =>
@@ -219,7 +248,13 @@ export function useChatbot() {
     inputMessage,
     intentMode,
     sidebarVisible,
-    isLoading,
+    isSendingMessage,
+    isLoadingMessages,
+    isRespondingToAction,
+    isLoadingConversations,
+    isComposerDisabled,
+    isBotThinking,
+    processingActionId,
     error,
     setInputMessage,
     setIntentMode,

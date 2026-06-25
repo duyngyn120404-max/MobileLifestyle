@@ -1,4 +1,5 @@
 import { env } from "@/src/config/env";
+import { API_ROUTES } from "@/src/config/apiRoutes";
 import { supabase } from "@/src/config/supabase";
 
 export interface ApiSuccess<T> {
@@ -20,7 +21,6 @@ export type ApiResponse<T> = ApiSuccess<T> | ApiFailure;
 
 const DEFAULT_HEADERS = {
   "Content-Type": "application/json",
-  "ngrok-skip-browser-warning": "true",
 };
 
 const joinUrl = (baseUrl: string, path: string) =>
@@ -45,7 +45,9 @@ async function getAuthHeader(): Promise<Record<string, string>> {
 
 async function request<T>(path: string, options: RequestInit = {}, withAuth = true): Promise<T> {
   const authHeaders = withAuth ? await getAuthHeader() : {};
-  const response = await fetch(joinUrl(env.appBackendUrl, path), {
+  const url = joinUrl(env.appBackendUrl, path);
+
+  const response = await fetch(url, {
     ...options,
     headers: {
       ...DEFAULT_HEADERS,
@@ -105,5 +107,16 @@ export const apiClient = {
 
   delete<T>(path: string, withAuth = true) {
     return request<T>(path, { method: "DELETE" }, withAuth);
+  },
+
+  transcribe(audio: string, format: string) {
+    return request<{ text?: string; transcription?: string }>(
+      API_ROUTES.transcribe,
+      {
+        method: "POST",
+        body: JSON.stringify({ audio, format }),
+      },
+      false,
+    );
   },
 };

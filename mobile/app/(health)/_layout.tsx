@@ -49,6 +49,14 @@ export default function HealthLayout() {
           animation: "slide_from_right",
         }}
       />
+
+      <Stack.Screen
+        name="reports"
+        options={{
+          presentation: "card",
+          animation: "slide_from_right",
+        }}
+      />
     </Stack>
   );
 }

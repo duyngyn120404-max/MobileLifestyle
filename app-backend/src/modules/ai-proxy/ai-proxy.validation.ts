@@ -8,6 +8,7 @@ import type {
   IntentMode,
   PositionType,
   SaveBpRecordRequest,
+  SaveMeasurementSessionRequest,
   SaveRiskProfileRequest,
   SubmitInteractionRequest,
 } from "./ai-proxy.types.js";
@@ -103,6 +104,68 @@ export function validateBpRecord(body: unknown): SaveBpRecordRequest {
     deviceType: requireEnum(payload.deviceType, DEVICE_TYPES, "deviceType"),
     deviceValidated: payload.deviceValidated,
     measuredAt: new Date(payload.measuredAt).toISOString(),
+  };
+}
+
+
+export function validateMeasurementSession(body: unknown): SaveMeasurementSessionRequest {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return validationError("Measurement session payload must be an object");
+  }
+
+  const payload = body as Record<string, unknown>;
+  const allowedFields = [
+    "measuredAt",
+    "source",
+    "position",
+    "restedMinutes",
+    "deviceType",
+    "deviceValidated",
+    "readings",
+  ];
+  if (Object.keys(payload).some((field) => !allowedFields.includes(field))) {
+    return validationError("Measurement session payload contains invalid fields");
+  }
+  if (typeof payload.measuredAt !== "string" || Number.isNaN(Date.parse(payload.measuredAt))) {
+    return validationError("measuredAt must be a valid date");
+  }
+  if (typeof payload.deviceValidated !== "boolean") {
+    return validationError("deviceValidated must be a boolean");
+  }
+  const restedMinutes =
+    payload.restedMinutes === null
+      ? null
+      : requireNumber(payload, "restedMinutes", 0, 180);
+
+  if (!Array.isArray(payload.readings) || payload.readings.length < 2) {
+    return validationError("readings must contain at least 2 readings");
+  }
+
+  const readings = payload.readings.map((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      return validationError(`readings[${index}] must be an object`);
+    }
+    const reading = entry as Record<string, unknown>;
+    const allowedReadingFields = ["systolic", "diastolic"];
+    if (Object.keys(reading).some((field) => !allowedReadingFields.includes(field))) {
+      return validationError(`readings[${index}] contains invalid fields`);
+    }
+    const systolic = requireNumber(reading, "systolic", 40, 300);
+    const diastolic = requireNumber(reading, "diastolic", 30, 200);
+    if (systolic <= diastolic) {
+      return validationError(`readings[${index}].systolic must be greater than diastolic`);
+    }
+    return { systolic, diastolic };
+  });
+
+  return {
+    measuredAt: new Date(payload.measuredAt).toISOString(),
+    source: requireEnum(payload.source, BP_SOURCES, "source"),
+    position: requireEnum(payload.position, POSITIONS, "position"),
+    restedMinutes,
+    deviceType: requireEnum(payload.deviceType, DEVICE_TYPES, "deviceType"),
+    deviceValidated: payload.deviceValidated,
+    readings,
   };
 }
 

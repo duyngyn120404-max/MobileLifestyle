@@ -1,8 +1,8 @@
 export interface MeasurementQualityItem {
   source: string;
-  qualityScore: number;
-  qualityLevel: "high" | "medium" | "low";
-  usable: boolean;
+  qualityScore: number | null;
+  qualityLevel: "high" | "medium" | "low" | null;
+  usable: boolean | null;
   flags: string[];
 }
 
@@ -20,11 +20,7 @@ export interface BpAverages {
 export interface ReportClassification {
   bpCategory?: "normal" | "elevated" | "hypertension";
   bpStage?: string;
-  phenotype?:
-    | "sustained_hypertension"
-    | "white_coat_hypertension"
-    | "masked_hypertension"
-    | "normal";
+  phenotype?: string;
   sourceUsed?: string;
   confidence?: "high" | "medium" | "low";
   dataSource?: "live" | "stored";
@@ -49,6 +45,11 @@ export interface ReportMlRisk {
 }
 
 export interface HealthReport {
+  id?: string | null;
+  weekStart?: string | null;
+  weekEnd?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   classification: ReportClassification;
   clinicalReasoning?: {
     explanation?: string;
@@ -63,6 +64,10 @@ export interface HealthReport {
 
 export interface LatestReportResponse {
   report: HealthReport | null;
+}
+
+export interface ReportsListResponse {
+  reports: HealthReport[];
 }
 
 export interface GenerateReportResponse {

@@ -1,9 +1,9 @@
 import { aiProxyClient } from "@/src/api/aiProxyClient";
-import type { BpRecord } from "@/src/features/health/types/health.types";
+import type { MeasurementSession } from "@/src/features/health/types/health.types";
 import { useCallback, useState } from "react";
 
 export function useHealthTracking() {
-  const [records, setRecords] = useState<BpRecord[]>([]);
+  const [records, setRecords] = useState<MeasurementSession[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -12,7 +12,7 @@ export function useHealthTracking() {
       try {
         setLoading(true);
         setError(null);
-        const data = await aiProxyClient.listBpRecords(filters);
+        const data = await aiProxyClient.listMeasurementSessions(filters);
         setRecords(data);
         return data;
       } catch (requestError) {
@@ -28,11 +28,11 @@ export function useHealthTracking() {
   );
 
   const getRecord = useCallback(async (recordId: string) => {
-    return aiProxyClient.getBpRecord(recordId);
+    return aiProxyClient.getMeasurementSession(recordId);
   }, []);
 
   const deleteRecord = useCallback(async (recordId: string) => {
-    return aiProxyClient.deleteBpRecord(recordId);
+    return aiProxyClient.deleteMeasurementSession(recordId);
   }, []);
 
   return { records, loading, error, loadRecords, getRecord, deleteRecord };

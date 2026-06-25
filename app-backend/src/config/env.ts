@@ -6,11 +6,13 @@ import { config } from "dotenv";
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.resolve(currentDir, "../..");
 const projectRoot = path.resolve(backendRoot, "..");
+const workspaceRoot = path.resolve(projectRoot, "..");
 
 config({
   path: [
     path.join(backendRoot, ".env"),
     path.join(projectRoot, "mobile/.env.local"),
+    path.join(workspaceRoot, "UnifiedService/.env"),
   ],
 });
 
@@ -57,6 +59,10 @@ export const env = {
   corsAllowedOrigins: readCsv("CORS_ALLOWED_ORIGINS"),
   supabaseUrl: readUrl("SUPABASE_URL", process.env.EXPO_PUBLIC_SUPABASE_URL),
   supabaseAnonKey: readString("SUPABASE_ANON_KEY", process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY),
+  odooWebhookApiKey: readString(
+    "ODOO_WEBHOOK_API_KEY",
+    isProduction ? undefined : "development-odoo-webhook-key",
+  ),
   aiServiceBaseUrl: readUrl("AI_SERVICE_BASE_URL", "http://localhost:8001/api/v1"),
   aiServiceApiKey: readString(
     "AI_SERVICE_API_KEY",

@@ -69,8 +69,52 @@ export interface SaveBpRecordRequest {
   measuredAt: string;
 }
 
-export interface BpRecord extends SaveBpRecordRequest {
+export interface BpRecord {
   id: string;
+  systolic: number;
+  diastolic: number;
+  source: string | null;
+  dayPeriod: string | null;
+  position: string | null;
+  restedMinutes: number | null;
+  deviceType: string | null;
+  deviceValidated: boolean | null;
+  measuredAt: string;
+  warnings?: string[];
+}
+
+
+export interface SaveBpReadingRequest {
+  systolic: number;
+  diastolic: number;
+}
+
+export interface BpReading extends SaveBpReadingRequest {
+  id?: string | null;
+  order: number;
+}
+
+export interface SaveMeasurementSessionRequest {
+  measuredAt: string;
+  source: BpSource;
+  position: PositionType;
+  restedMinutes: number | null;
+  deviceType: DeviceType;
+  deviceValidated: boolean;
+  readings: SaveBpReadingRequest[];
+}
+
+export interface MeasurementSession {
+  id: string;
+  measuredAt: string;
+  measuredDate: string;
+  dayPeriod: string;
+  source: string | null;
+  position: string | null;
+  restedMinutes: number | null;
+  deviceType: string | null;
+  deviceValidated: boolean | null;
+  readings: BpReading[];
   warnings?: string[];
 }
 
@@ -86,9 +130,9 @@ export interface RiskProfile extends SaveRiskProfileRequest {
 
 export interface MeasurementQualityItem {
   source: string;
-  qualityScore: number;
-  qualityLevel: "high" | "medium" | "low";
-  usable: boolean;
+  qualityScore: number | null;
+  qualityLevel: "high" | "medium" | "low" | null;
+  usable: boolean | null;
   flags: string[];
 }
 
@@ -106,11 +150,7 @@ export interface BpAverages {
 export interface ReportClassification {
   bpCategory?: "normal" | "elevated" | "hypertension";
   bpStage?: string;
-  phenotype?:
-    | "sustained_hypertension"
-    | "white_coat_hypertension"
-    | "masked_hypertension"
-    | "normal";
+  phenotype?: string;
   sourceUsed?: string;
   confidence?: "high" | "medium" | "low";
   dataSource?: "live" | "stored";
@@ -135,6 +175,11 @@ export interface ReportMlRisk {
 }
 
 export interface HealthReport {
+  id?: string | null;
+  weekStart?: string | null;
+  weekEnd?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
   classification: ReportClassification;
   clinicalReasoning?: {
     explanation?: string;
@@ -149,6 +194,10 @@ export interface HealthReport {
 
 export interface LatestReportResponse {
   report: HealthReport | null;
+}
+
+export interface ReportsListResponse {
+  reports: HealthReport[];
 }
 
 export interface GenerateReportResponse {

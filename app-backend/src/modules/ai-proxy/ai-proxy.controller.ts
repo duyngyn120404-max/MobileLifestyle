@@ -91,6 +91,48 @@ export async function deleteBpRecord(request: Request, response: Response) {
   return sendSuccess(response, data);
 }
 
+
+export async function listMeasurementSessions(request: Request, response: Response) {
+  const data = await aiProxyService.listMeasurementSessions(
+    request.query as Record<string, unknown>,
+    requireAccessToken(request),
+  );
+  return sendSuccess(response, data);
+}
+
+export async function getMeasurementSession(request: Request, response: Response) {
+  const data = await aiProxyService.getMeasurementSession(
+    request.params.sessionId,
+    requireAccessToken(request),
+  );
+  return sendSuccess(response, data);
+}
+
+export async function createMeasurementSession(request: Request, response: Response) {
+  const data = await aiProxyService.createMeasurementSession(
+    request.body,
+    requireAccessToken(request),
+  );
+  return sendSuccess(response, data, undefined, 201);
+}
+
+export async function updateMeasurementSession(request: Request, response: Response) {
+  const data = await aiProxyService.updateMeasurementSession(
+    request.params.sessionId,
+    request.body,
+    requireAccessToken(request),
+  );
+  return sendSuccess(response, data);
+}
+
+export async function deleteMeasurementSession(request: Request, response: Response) {
+  const data = await aiProxyService.deleteMeasurementSession(
+    request.params.sessionId,
+    requireAccessToken(request),
+  );
+  return sendSuccess(response, data);
+}
+
 export async function getRiskProfile(request: Request, response: Response) {
   const data = await aiProxyService.getRiskProfile(requireAccessToken(request));
   return sendSuccess(response, data);
@@ -106,6 +148,14 @@ export async function saveRiskProfile(request: Request, response: Response) {
 
 export async function getLatestReport(request: Request, response: Response) {
   const data = await aiProxyService.getLatestReport(requireAccessToken(request));
+  return sendSuccess(response, data);
+}
+
+export async function listReports(request: Request, response: Response) {
+  const data = await aiProxyService.listReports(
+    request.query as Record<string, unknown>,
+    requireAccessToken(request),
+  );
   return sendSuccess(response, data);
 }
 

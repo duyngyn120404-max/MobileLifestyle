@@ -3,8 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "mobile": "npm --prefix mobile run start",
+    "mobile": "npm --prefix mobile run start --",
     "backend": "npm --prefix app-backend run dev",
     "mobile:lint": "npm --prefix mobile run lint"
+  },
+  "devDependencies": {
+    "node": "^20.20.2",
+    "npm": "^10.9.8"
   }
 }

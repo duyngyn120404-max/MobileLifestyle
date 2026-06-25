@@ -10,8 +10,11 @@ import type {
   AiServiceGenerateReportResponse,
   AiServiceHealthReport,
   AiServiceLatestReportResponse,
+  AiServiceMeasurementSessionResponse,
+  AiServiceReportsListResponse,
   AiServiceRiskProfileResponse,
   AiServiceSaveBpRecordRequest,
+  AiServiceSaveMeasurementSessionRequest,
   AiServiceSaveRiskProfileRequest,
 } from "./ai-service.types.js";
 import type {
@@ -22,9 +25,12 @@ import type {
   GenerateReportResponse,
   HealthReport,
   LatestReportResponse,
+  MeasurementSession,
   PendingAction,
+  ReportsListResponse,
   RiskProfile,
   SaveBpRecordRequest,
+  SaveMeasurementSessionRequest,
   SaveRiskProfileRequest,
   SubmitInteractionRequest,
   SubmitInteractionResponse,
@@ -61,6 +67,13 @@ function asString(value: unknown, name: string): string {
 }
 
 function asNumber(value: unknown, name: string): number {
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
   if (typeof value !== "number" || !Number.isFinite(value)) {
     return invalidResponse(`${name} must be a number`);
   }
@@ -106,6 +119,21 @@ function optionalNumber(value: unknown, name: string): number | undefined {
 
 function optionalBoolean(value: unknown, name: string): boolean | undefined {
   return value === undefined ? undefined : asBoolean(value, name);
+}
+
+function nullableString(value: unknown, name: string): string | null {
+  if (value === null || value === undefined) return null;
+  return asString(value, name);
+}
+
+function nullableNumber(value: unknown, name: string): number | null {
+  if (value === null || value === undefined) return null;
+  return asNumber(value, name);
+}
+
+function nullableBoolean(value: unknown, name: string): boolean | null {
+  if (value === null || value === undefined) return null;
+  return asBoolean(value, name);
 }
 
 function optionalEnum<T extends string>(
@@ -157,6 +185,24 @@ export function toAiServiceBpRecordRequest(
   };
 }
 
+
+export function toAiServiceMeasurementSessionRequest(
+  request: SaveMeasurementSessionRequest,
+): AiServiceSaveMeasurementSessionRequest {
+  return {
+    measuredAt: request.measuredAt,
+    source: request.source,
+    position: request.position,
+    restedMinutes: request.restedMinutes,
+    deviceType: request.deviceType,
+    deviceValidated: request.deviceValidated,
+    readings: request.readings.map((reading) => ({
+      systolic: reading.systolic,
+      diastolic: reading.diastolic,
+    })),
+  };
+}
+
 export function toAiServiceRiskProfileRequest(
   request: SaveRiskProfileRequest,
 ): AiServiceSaveRiskProfileRequest {
@@ -186,7 +232,7 @@ export function toPublicConversationList(value: unknown): ConversationSummary[] 
 function toPublicPendingAction(value: unknown): PendingAction {
   const payload = asObject(value, "action");
   let details: { label: string; value: string }[] | undefined;
-  if (payload.details !== undefined) {
+  if (payload.details !== undefined && payload.details !== null) {
     if (!Array.isArray(payload.details)) {
       return invalidResponse("action.details must be an array");
     }
@@ -210,7 +256,7 @@ function toPublicPendingAction(value: unknown): PendingAction {
 export function toPublicChatMessage(value: unknown): ChatMessage {
   const payload = asObject(value, "message");
   const actions =
-    payload.actions === undefined
+    payload.actions === undefined || payload.actions === null
       ? undefined
       : Array.isArray(payload.actions)
         ? payload.actions.map(toPublicPendingAction)
@@ -241,20 +287,16 @@ export function toPublicInteractionResponse(value: unknown): SubmitInteractionRe
 
 export function toPublicBpRecord(value: unknown): BpRecord {
   const payload = asObject(value, "bp record");
-  const restedMinutes =
-    payload.restedMinutes === null
-      ? null
-      : asNumber(payload.restedMinutes, "bpRecord.restedMinutes");
   const parsed: AiServiceBpRecordResponse = {
     id: asString(payload.id, "bpRecord.id"),
     systolic: asNumber(payload.systolic, "bpRecord.systolic"),
     diastolic: asNumber(payload.diastolic, "bpRecord.diastolic"),
-    source: asEnum(payload.source, BP_SOURCES, "bpRecord.source"),
-    dayPeriod: asEnum(payload.dayPeriod, DAY_PERIODS, "bpRecord.dayPeriod"),
-    position: asEnum(payload.position, POSITIONS, "bpRecord.position"),
-    restedMinutes,
-    deviceType: asEnum(payload.deviceType, DEVICE_TYPES, "bpRecord.deviceType"),
-    deviceValidated: asBoolean(payload.deviceValidated, "bpRecord.deviceValidated"),
+    source: nullableString(payload.source, "bpRecord.source"),
+    dayPeriod: nullableString(payload.dayPeriod, "bpRecord.dayPeriod"),
+    position: nullableString(payload.position, "bpRecord.position"),
+    restedMinutes: nullableNumber(payload.restedMinutes, "bpRecord.restedMinutes"),
+    deviceType: nullableString(payload.deviceType, "bpRecord.deviceType"),
+    deviceValidated: nullableBoolean(payload.deviceValidated, "bpRecord.deviceValidated"),
     measuredAt: asString(payload.measuredAt, "bpRecord.measuredAt"),
     ...(payload.warnings === undefined
       ? {}
@@ -266,6 +308,47 @@ export function toPublicBpRecord(value: unknown): BpRecord {
 export function toPublicBpRecordList(value: unknown): BpRecord[] {
   if (!Array.isArray(value)) return invalidResponse("bp records must be an array");
   return value.map(toPublicBpRecord);
+}
+
+
+function toPublicBpReading(value: unknown, index: number) {
+  const payload = asObject(value, `measurementSession.readings[${index}]`);
+  return {
+    ...(payload.id === undefined || payload.id === null
+      ? {}
+      : { id: asString(payload.id, `measurementSession.readings[${index}].id`) }),
+    order: asNumber(payload.order, `measurementSession.readings[${index}].order`),
+    systolic: asNumber(payload.systolic, `measurementSession.readings[${index}].systolic`),
+    diastolic: asNumber(payload.diastolic, `measurementSession.readings[${index}].diastolic`),
+  };
+}
+
+export function toPublicMeasurementSession(value: unknown): MeasurementSession {
+  const payload = asObject(value, "measurement session");
+  if (!Array.isArray(payload.readings)) {
+    return invalidResponse("measurementSession.readings must be an array");
+  }
+  const parsed: AiServiceMeasurementSessionResponse = {
+    id: asString(payload.id, "measurementSession.id"),
+    measuredAt: asString(payload.measuredAt, "measurementSession.measuredAt"),
+    measuredDate: asString(payload.measuredDate, "measurementSession.measuredDate"),
+    dayPeriod: asString(payload.dayPeriod, "measurementSession.dayPeriod"),
+    source: nullableString(payload.source, "measurementSession.source"),
+    position: nullableString(payload.position, "measurementSession.position"),
+    restedMinutes: nullableNumber(payload.restedMinutes, "measurementSession.restedMinutes"),
+    deviceType: nullableString(payload.deviceType, "measurementSession.deviceType"),
+    deviceValidated: nullableBoolean(payload.deviceValidated, "measurementSession.deviceValidated"),
+    readings: payload.readings.map(toPublicBpReading),
+    ...(payload.warnings === undefined
+      ? {}
+      : { warnings: optionalStrings(payload.warnings, "measurementSession.warnings") }),
+  };
+  return { ...parsed };
+}
+
+export function toPublicMeasurementSessionList(value: unknown): MeasurementSession[] {
+  if (!Array.isArray(value)) return invalidResponse("measurement sessions must be an array");
+  return value.map(toPublicMeasurementSession);
 }
 
 export function toPublicRiskProfile(value: unknown): RiskProfile {
@@ -313,10 +396,16 @@ function toPublicReport(value: unknown): HealthReport {
             const item = asObject(entry, "report.classification.measurementQuality item");
             return {
               source: asString(item.source, "measurementQuality.source"),
-              qualityScore: asNumber(item.qualityScore, "measurementQuality.qualityScore"),
-              qualityLevel: asEnum(item.qualityLevel, CONFIDENCE_LEVELS, "measurementQuality.qualityLevel"),
-              usable: asBoolean(item.usable, "measurementQuality.usable"),
-              flags: asStringArray(item.flags, "measurementQuality.flags"),
+              qualityScore: nullableNumber(item.qualityScore, "measurementQuality.qualityScore"),
+              qualityLevel:
+                item.qualityLevel === null || item.qualityLevel === undefined
+                  ? null
+                  : asEnum(item.qualityLevel, CONFIDENCE_LEVELS, "measurementQuality.qualityLevel"),
+              usable: nullableBoolean(item.usable, "measurementQuality.usable"),
+              flags:
+                item.flags === null || item.flags === undefined
+                  ? []
+                  : asStringArray(item.flags, "measurementQuality.flags"),
             };
           })
         : invalidResponse("report.classification.measurementQuality must be an array");
@@ -328,9 +417,9 @@ function toPublicReport(value: unknown): HealthReport {
     ...(optionalString(classificationPayload.bpStage, "report.classification.bpStage") === undefined
       ? {}
       : { bpStage: asString(classificationPayload.bpStage, "report.classification.bpStage") }),
-    ...(optionalEnum(classificationPayload.phenotype, ["sustained_hypertension", "white_coat_hypertension", "masked_hypertension", "normal"] as const, "report.classification.phenotype") === undefined
+    ...(optionalString(classificationPayload.phenotype, "report.classification.phenotype") === undefined
       ? {}
-      : { phenotype: asEnum(classificationPayload.phenotype, ["sustained_hypertension", "white_coat_hypertension", "masked_hypertension", "normal"] as const, "report.classification.phenotype") }),
+      : { phenotype: asString(classificationPayload.phenotype, "report.classification.phenotype") }),
     ...(optionalString(classificationPayload.sourceUsed, "report.classification.sourceUsed") === undefined
       ? {}
       : { sourceUsed: asString(classificationPayload.sourceUsed, "report.classification.sourceUsed") }),
@@ -340,7 +429,7 @@ function toPublicReport(value: unknown): HealthReport {
     ...(optionalEnum(classificationPayload.dataSource, ["live", "stored"] as const, "report.classification.dataSource") === undefined
       ? {}
       : { dataSource: asEnum(classificationPayload.dataSource, ["live", "stored"] as const, "report.classification.dataSource") }),
-    ...(optionalString(classificationPayload.dataTimestamp, "report.classification.dataTimestamp") === undefined
+    ...(classificationPayload.dataTimestamp === undefined || classificationPayload.dataTimestamp === null
       ? {}
       : { dataTimestamp: asString(classificationPayload.dataTimestamp, "report.classification.dataTimestamp") }),
     ...(averagesPayload === undefined
@@ -377,7 +466,7 @@ function toPublicReport(value: unknown): HealthReport {
             ...(optionalString(item.explanation, "report.risk.explanation") === undefined ? {} : { explanation: asString(item.explanation, "report.risk.explanation") }),
             ...(optionalEnum(item.confidence, CONFIDENCE_LEVELS, "report.risk.confidence") === undefined ? {} : { confidence: asEnum(item.confidence, CONFIDENCE_LEVELS, "report.risk.confidence") }),
             ...(optionalEnum(item.dataSource, ["live", "stored"] as const, "report.risk.dataSource") === undefined ? {} : { dataSource: asEnum(item.dataSource, ["live", "stored"] as const, "report.risk.dataSource") }),
-            ...(optionalString(item.dataTimestamp, "report.risk.dataTimestamp") === undefined ? {} : { dataTimestamp: asString(item.dataTimestamp, "report.risk.dataTimestamp") }),
+            ...(item.dataTimestamp === undefined || item.dataTimestamp === null ? {} : { dataTimestamp: asString(item.dataTimestamp, "report.risk.dataTimestamp") }),
           };
         })();
   const mlRisk =
@@ -411,6 +500,11 @@ function toPublicReport(value: unknown): HealthReport {
   }
 
   const parsed: AiServiceHealthReport = {
+    ...(payload.id === undefined || payload.id === null ? {} : { id: asString(payload.id, "report.id") }),
+    ...(payload.weekStart === undefined || payload.weekStart === null ? {} : { weekStart: asString(payload.weekStart, "report.weekStart") }),
+    ...(payload.weekEnd === undefined || payload.weekEnd === null ? {} : { weekEnd: asString(payload.weekEnd, "report.weekEnd") }),
+    ...(payload.createdAt === undefined || payload.createdAt === null ? {} : { createdAt: asString(payload.createdAt, "report.createdAt") }),
+    ...(payload.updatedAt === undefined || payload.updatedAt === null ? {} : { updatedAt: asString(payload.updatedAt, "report.updatedAt") }),
     classification,
     ...(clinicalReasoning === undefined ? {} : { clinicalReasoning }),
     ...(risk === undefined ? {} : { risk }),
@@ -427,6 +521,17 @@ export function toPublicLatestReportResponse(value: unknown): LatestReportRespon
   const payload = asObject(value, "latest report response");
   const parsed: AiServiceLatestReportResponse = {
     report: payload.report === null ? null : toPublicReport(payload.report),
+  };
+  return parsed;
+}
+
+export function toPublicReportsListResponse(value: unknown): ReportsListResponse {
+  const payload = asObject(value, "reports response");
+  if (!Array.isArray(payload.reports)) {
+    return invalidResponse("reports response.reports must be an array");
+  }
+  const parsed: AiServiceReportsListResponse = {
+    reports: payload.reports.map(toPublicReport),
   };
   return parsed;
 }

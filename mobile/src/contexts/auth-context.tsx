@@ -1,4 +1,5 @@
 import { authClient } from "@/src/api/authClient";
+import { logger } from "@/src/utils/logger";
 import { User } from "@supabase/supabase-js";
 import { createContext, useContext, useEffect, useState } from "react";
 
@@ -11,6 +12,28 @@ type AuthContextType = {
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const NETWORK_ERROR_MESSAGE =
+  "Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng và thử lại.";
+
+function getUserFacingAuthError(error: unknown, fallback: string) {
+  if (!error || typeof error !== "object") return fallback;
+
+  const authError = error as { name?: unknown; message?: unknown };
+  const errorName = typeof authError.name === "string" ? authError.name : "";
+  const errorMessage =
+    typeof authError.message === "string" ? authError.message : "";
+
+  const message = errorMessage.toLowerCase();
+  if (
+    errorName === "TypeError" ||
+    message.includes("network request failed") ||
+    message.includes("failed to fetch")
+  ) {
+    return NETWORK_ERROR_MESSAGE;
+  }
+
+  return errorMessage || fallback;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -22,12 +45,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = authClient.onAuthStateChange(async (_event, session) => {
-      console.log(
-        "[auth] onAuthStateChange event:",
-        _event,
-        "user:",
-        session?.user?.id ?? null,
-      );
+      logger.info("auth.state", "changed", {
+        event: _event,
+        userId: session?.user?.id ?? null,
+      });
       setUser(session?.user ?? null);
     });
 
@@ -48,7 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(session?.user ?? null);
-    } catch {
+    } catch (error) {
+      logger.error("auth.restoreSession", "failed", error);
       setUser(null);
     } finally {
       setIsLoadingUser(false);
@@ -58,25 +80,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (email: string, password: string) => {
     try {
       const {
-        data: { user: newUser },
+        data: { session, user: newUser },
         error: signUpError,
       } = await authClient.signUp(email, password);
 
       if (signUpError) {
-        return signUpError.message;
+        logger.warn("auth.signUp", "failed", {
+          errorName: signUpError.name,
+          errorMessage: signUpError.message,
+        });
+        return getUserFacingAuthError(
+          signUpError,
+          "Không thể đăng ký tài khoản. Vui lòng thử lại.",
+        );
       }
 
       if (!newUser?.id) {
+        logger.error("auth.signUp", "failed", "Failed to create user account");
         return "Failed to create user account";
+      }
+
+      if (session) {
+        const { error: signOutError } = await authClient.signOut();
+        if (signOutError) {
+          logger.error("auth.signUp", "post sign-up sign out failed", signOutError);
+          return getUserFacingAuthError(
+            signOutError,
+            "Đăng ký thành công nhưng không thể kết thúc phiên tự động. Vui lòng thử lại.",
+          );
+        }
+        setUser(null);
       }
 
       return null;
     } catch (error) {
-      if (error instanceof Error) {
-        return error.message;
-      }
-
-      return "An error occurred during sign up.";
+      logger.error("auth.signUp", "failed", error);
+      return getUserFacingAuthError(
+        error,
+        "Không thể đăng ký tài khoản. Vui lòng thử lại.",
+      );
     }
   };
 
@@ -88,33 +130,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } = await authClient.signIn(email, password);
 
       if (error) {
-        return error.message;
+        logger.warn("auth.signIn", "failed", {
+          errorName: error.name,
+          errorMessage: error.message,
+        });
+        return getUserFacingAuthError(
+          error,
+          "Không thể đăng nhập. Vui lòng thử lại.",
+        );
       }
 
       setUser(signInUser);
       return null;
     } catch (error) {
-      if (error instanceof Error) {
-        return error.message;
-      }
-      return "An error occurred during sign in.";
+      logger.error("auth.signIn", "failed", error);
+      return getUserFacingAuthError(
+        error,
+        "Không thể đăng nhập. Vui lòng thử lại.",
+      );
     }
   };
 
   const signOut = async () => {
     try {
-      console.log("[auth] signOut called");
+      logger.info("auth.signOut", "started", { userId: user?.id ?? null });
       const { error } = await authClient.signOut();
-      console.log("[auth] supabase.auth.signOut result, error:", error);
+      if (error) {
+        logger.error("auth.signOut", "failed", error);
+      }
       setUser(null);
     } catch (error) {
-      console.log("[auth] signOut exception:", error);
+      logger.error("auth.signOut", "failed", error);
     }
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoadingUser, signUp, signIn, signOut }}
+      value={{
+        user,
+        isLoadingUser,
+        signUp,
+        signIn,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>

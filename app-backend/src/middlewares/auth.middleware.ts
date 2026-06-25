@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 
 import { services } from "../config/services.js";
+import { logger } from "../shared/logger.js";
 import { AppError } from "../shared/errors/app-error.js";
 import { ERROR_CODES } from "../shared/errors/error-codes.js";
 import type { CurrentUser } from "../types/current-user.js";
@@ -63,6 +64,17 @@ export async function authMiddleware(
     request.authAccessToken = accessToken;
     next();
   } catch (error) {
+    const context = {
+      method: request.method,
+      path: request.originalUrl,
+    };
+
+    if (error instanceof AppError) {
+      logger.warn("authMiddleware", error.message, error, context);
+    } else {
+      logger.error("authMiddleware", "token verify exception", error, context);
+    }
+
     next(error);
   }
 }

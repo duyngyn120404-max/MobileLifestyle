@@ -1,5 +1,5 @@
 import { useHealthTracking } from "@/src/features/health/hooks/useHealthTracking";
-import type { BpRecord } from "@/src/features/health/types/health.types";
+import type { MeasurementSession } from "@/src/features/health/types/health.types";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
@@ -28,13 +28,13 @@ function formatDateTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
 
-  return `${date.toLocaleDateString("vi-VN")} ${date.toLocaleTimeString(
-    "vi-VN",
-    {
-      hour: "2-digit",
-      minute: "2-digit",
-    },
-  )}`;
+  return `${date.toLocaleDateString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+  })} ${date.toLocaleTimeString("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    hour: "2-digit",
+    minute: "2-digit",
+  })}`;
 }
 
 function formatDayPeriod(value: string | null) {
@@ -110,7 +110,7 @@ export default function TrackingDetailScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const { getRecord, deleteRecord } = useHealthTracking();
 
-  const [record, setRecord] = useState<BpRecord | null>(null);
+  const [record, setRecord] = useState<MeasurementSession | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -159,7 +159,7 @@ export default function TrackingDetailScreen() {
   const handleDelete = () => {
     if (!params.id || deleting) return;
 
-    Alert.alert("Xóa bản ghi", "Bạn có chắc muốn xóa bản ghi này không?", [
+    Alert.alert("Xóa buổi đo", "Bạn có chắc muốn xóa buổi đo này không?", [
       { text: "Hủy", style: "cancel" },
       {
         text: "Xóa",
@@ -195,9 +195,9 @@ export default function TrackingDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.pageHeading}>
-          <Text style={styles.pageTitle}>Chi tiết lần đo</Text>
+          <Text style={styles.pageTitle}>Chi tiết buổi đo</Text>
           <Text style={styles.pageSubtitle}>
-            Xem lại đầy đủ thông tin và thao tác trên bản ghi.
+            Xem lại dữ liệu thô của từng lần đo trong buổi.
           </Text>
         </View>
 
@@ -214,17 +214,24 @@ export default function TrackingDetailScreen() {
             </View>
 
             <Text style={styles.bpTitle}>
-              {record
-                ? `${record.systolic}/${record.diastolic} mmHg`
-                : "Đang tải..."}
+              {record ? `${record.readings.length} lần đo huyết áp` : "Đang tải..."}
             </Text>
 
             <Text style={styles.bpSubtitle}>
-              {record ? `Bản ghi #${record.id}` : "Vui lòng chờ tải dữ liệu"}
+              {record ? `Buổi đo #${record.id}` : "Vui lòng chờ tải dữ liệu"}
             </Text>
 
             {record ? (
               <View style={styles.detailGroup}>
+
+                {record.readings.map((reading, index) => (
+                  <DetailRow
+                    key={reading.id ?? `${record.id}-${index}`}
+                    label={`Lần đo ${reading.order || index + 1}`}
+                    value={`${reading.systolic}/${reading.diastolic} mmHg`}
+                    icon="heart-pulse"
+                  />
+                ))}
                 <DetailRow
                   label="Thời gian đo"
                   value={formatDateTime(record.measuredAt)}
@@ -271,7 +278,7 @@ export default function TrackingDetailScreen() {
             ) : (
               <View style={styles.loadingWrap}>
                 <Text style={styles.loadingText}>
-                  Đang tải thông tin bản ghi...
+                  Đang tải thông tin buổi đo...
                 </Text>
               </View>
             )}

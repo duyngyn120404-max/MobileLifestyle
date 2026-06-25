@@ -41,6 +41,54 @@ export interface BpRecordFormValues {
   measuredAt: string;
 }
 
+
+export interface SaveBpReadingRequest {
+  systolic: number;
+  diastolic: number;
+}
+
+export interface BpReading extends SaveBpReadingRequest {
+  id?: string | null;
+  order: number;
+}
+
+export interface SaveMeasurementSessionRequest {
+  measuredAt: string;
+  source: BpSource;
+  position: PositionType;
+  restedMinutes: number | null;
+  deviceType: DeviceType;
+  deviceValidated: boolean;
+  readings: SaveBpReadingRequest[];
+}
+
+export interface MeasurementSession {
+  id: string;
+  measuredAt: string;
+  measuredDate: string;
+  dayPeriod: DayPeriod | string;
+  source: BpSource | string | null;
+  position: PositionType | string | null;
+  restedMinutes: number | null;
+  deviceType: DeviceType | string | null;
+  deviceValidated: boolean | null;
+  readings: BpReading[];
+  warnings?: string[];
+}
+
+export interface MeasurementSessionFormValues {
+  reading1Systolic: string;
+  reading1Diastolic: string;
+  reading2Systolic: string;
+  reading2Diastolic: string;
+  source: BpSource;
+  position: PositionType;
+  restedMinutes: string;
+  deviceType: DeviceType;
+  deviceValidated: boolean;
+  measuredAt: string;
+}
+
 export interface RiskProfile {
   riskFactors: string[];
   hmodItems: string[];

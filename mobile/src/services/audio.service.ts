@@ -1,7 +1,7 @@
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Speech from 'expo-speech';
-import { apiClient } from '@/src/config/apiClient';
+import { apiClient } from '@/src/api/apiClient';
 import { cleanTextForSpeech } from '@/src/utils/formatting';
 
 export const audioService = {

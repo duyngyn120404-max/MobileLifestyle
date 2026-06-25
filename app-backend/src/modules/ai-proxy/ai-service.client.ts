@@ -10,26 +10,83 @@ async function readResponseBody(response: Response): Promise<unknown> {
   return response.json().catch(() => null);
 }
 
-function downstreamError(response: Response, payload: unknown): AppError {
-  const message =
-    payload &&
-    typeof payload === "object" &&
-    "message" in payload &&
-    typeof payload.message === "string"
-      ? payload.message
-      : "AI service request failed";
+function extractErrorMessage(payload: unknown): string {
+  if (!payload || typeof payload !== "object") {
+    return "AI service request failed";
+  }
 
+  if ("message" in payload && typeof payload.message === "string") {
+    return payload.message;
+  }
+
+  if ("error" in payload && typeof payload.error === "string") {
+    return payload.error;
+  }
+
+  if (!("detail" in payload)) {
+    return "AI service request failed";
+  }
+
+  const { detail } = payload;
+  if (typeof detail === "string") {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object" && "msg" in item && typeof item.msg === "string") {
+          return item.msg;
+        }
+        return null;
+      })
+      .filter((item): item is string => Boolean(item));
+
+    if (messages.length) {
+      return messages.join("; ");
+    }
+  }
+
+  return "AI service request failed";
+}
+
+function downstreamError(response: Response, payload: unknown, url: string): AppError {
+  const message = extractErrorMessage(payload);
+  console.error("[aiServiceClient] Downstream AI service error", {
+    status: response.status,
+    url,
+    payload,
+  });
+
+  if (response.status === 401) {
+    return new AppError(message, 401, ERROR_CODES.UNAUTHORIZED, payload);
+  }
+  if (response.status === 403) {
+    return new AppError(message, 403, ERROR_CODES.FORBIDDEN, payload);
+  }
   if (response.status === 400) {
-    return new AppError(message, 400, ERROR_CODES.VALIDATION_ERROR);
+    return new AppError(message, 400, ERROR_CODES.VALIDATION_ERROR, payload);
   }
   if (response.status === 404) {
-    return new AppError(message, 404, ERROR_CODES.NOT_FOUND);
+    return new AppError(message, 404, ERROR_CODES.NOT_FOUND, payload);
   }
   if (response.status === 409) {
-    return new AppError(message, 409, ERROR_CODES.CONFLICT);
+    return new AppError(message, 409, ERROR_CODES.CONFLICT, payload);
+  }
+  if (response.status === 422) {
+    return new AppError(message, 422, ERROR_CODES.VALIDATION_ERROR, payload);
   }
 
-  return new AppError("Unable to complete AI request", 502, ERROR_CODES.EXTERNAL_SERVICE_ERROR);
+  return new AppError(
+    message,
+    502,
+    ERROR_CODES.EXTERNAL_SERVICE_ERROR,
+    {
+      status: response.status,
+      payload,
+    },
+  );
 }
 
 async function request<T>(
@@ -41,7 +98,8 @@ async function request<T>(
   const timeout = setTimeout(() => controller.abort(), services.aiService.timeoutMs);
 
   try {
-    const response = await fetch(serviceUrl(path), {
+    const url = serviceUrl(path);
+    const response = await fetch(url, {
       ...options,
       signal: controller.signal,
       headers: {
@@ -53,7 +111,7 @@ async function request<T>(
     const payload = await readResponseBody(response);
 
     if (!response.ok) {
-      throw downstreamError(response, payload);
+      throw downstreamError(response, payload, url);
     }
 
     return payload as T;

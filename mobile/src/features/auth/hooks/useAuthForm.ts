@@ -1,4 +1,5 @@
 import { useAuth } from "@/src/contexts/auth-context";
+import { logger } from "@/src/utils/logger";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 
@@ -17,6 +18,23 @@ const INITIAL_AUTH_FORM: AuthFormState = {
   password: "",
   confirmPassword: "",
 };
+
+const NETWORK_ERROR_MESSAGE =
+  "Không thể kết nối đến máy chủ. Vui lòng kiểm tra mạng và thử lại.";
+
+function getSubmitErrorMessage(message: string) {
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes("typeerror") ||
+    normalizedMessage.includes("network request failed") ||
+    normalizedMessage.includes("failed to fetch")
+  ) {
+    return NETWORK_ERROR_MESSAGE;
+  }
+
+  return message;
+}
 
 export function useAuthForm() {
   const router = useRouter();
@@ -92,12 +110,12 @@ export function useAuthForm() {
         const signUpError = await signUp(email, form.password);
 
         if (signUpError) {
-          setSubmitError(signUpError);
+          setSubmitError(getSubmitErrorMessage(signUpError));
           return;
         }
 
         setSuccessMessage(
-          "Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản trước khi đăng nhập.",
+          "Đăng ký thành công. Vui lòng đăng nhập để tiếp tục.",
         );
         setMode("sign-in");
         setFieldErrors({});
@@ -112,12 +130,13 @@ export function useAuthForm() {
       const signInError = await signIn(email, form.password);
 
       if (signInError) {
-        setSubmitError(signInError);
+        setSubmitError(getSubmitErrorMessage(signInError));
         return;
       }
 
       router.replace("/");
-    } catch {
+    } catch (error) {
+      logger.error("auth.submit", "failed", error);
       setSubmitError("Đã có lỗi xảy ra. Vui lòng thử lại.");
     } finally {
       setLoading(false);

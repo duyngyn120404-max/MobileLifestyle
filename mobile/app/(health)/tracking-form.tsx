@@ -1,13 +1,12 @@
 import { useHealthForm } from "@/src/features/health/hooks/useHealthForm";
 import type {
   BpSource,
-  DayPeriod,
   DeviceType,
   PositionType,
 } from "@/src/features/health/types/health.types";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from "react-native";
 import {
   Button,
   Card,
@@ -81,28 +80,47 @@ export default function TrackingFormScreen() {
 
   const isEditMode = params.mode === "edit" && typeof params.id === "string";
   const recordId = typeof params.id === "string" ? params.id : null;
-  const { values, updateField, loadingInitial, isSubmitting, error, saveRecord } =
-    useHealthForm(recordId, isEditMode);
   const {
-    systolic,
-    diastolic,
+    values,
+    updateField,
+    loadingInitial,
+    isSubmitting,
+    error,
+    initialLoadError,
+    retryLoadRecord,
+    saveRecord,
+  } = useHealthForm(recordId, isEditMode);
+  const {
+    reading1Systolic,
+    reading1Diastolic,
+    reading2Systolic,
+    reading2Diastolic,
     source: bpSource,
-    dayPeriod,
     position,
     restedMinutes,
     deviceType,
     deviceValidated,
     measuredAt,
   } = values;
-  const setSystolic = (value: string) => updateField("systolic", value);
-  const setDiastolic = (value: string) => updateField("diastolic", value);
+  const setReading1Systolic = (value: string) => updateField("reading1Systolic", value);
+  const setReading1Diastolic = (value: string) => updateField("reading1Diastolic", value);
+  const setReading2Systolic = (value: string) => updateField("reading2Systolic", value);
+  const setReading2Diastolic = (value: string) => updateField("reading2Diastolic", value);
   const setBpSource = (value: BpSource) => updateField("source", value);
-  const setDayPeriod = (value: DayPeriod) => updateField("dayPeriod", value);
   const setPosition = (value: PositionType) => updateField("position", value);
   const setRestedMinutes = (value: string) => updateField("restedMinutes", value);
   const setDeviceType = (value: DeviceType) => updateField("deviceType", value);
   const setDeviceValidated = (value: boolean) => updateField("deviceValidated", value);
   const setMeasuredAt = (value: string) => updateField("measuredAt", value);
+  const fillMeasuredAtNow = () => {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = `${now.getMonth() + 1}`.padStart(2, "0");
+    const dd = `${now.getDate()}`.padStart(2, "0");
+    const hh = `${now.getHours()}`.padStart(2, "0");
+    const min = `${now.getMinutes()}`.padStart(2, "0");
+    setMeasuredAt(`${yyyy}-${mm}-${dd} ${hh}:${min}`);
+  };
 
   const [snackVisible, setSnackVisible] = useState(false);
   const [snackMessage, setSnackMessage] = useState("");
@@ -110,15 +128,15 @@ export default function TrackingFormScreen() {
   const [navigatingAfterWarning, setNavigatingAfterWarning] = useState(false);
 
   const title = useMemo(
-    () => (isEditMode ? "Chỉnh sửa lần đo" : "Tạo lần đo mới"),
+    () => (isEditMode ? "Chỉnh sửa buổi đo" : "Tạo buổi đo mới"),
     [isEditMode],
   );
 
   const subtitle = useMemo(
     () =>
       isEditMode
-        ? "Cập nhật chỉ số đo và bối cảnh đo của bản ghi hiện tại."
-        : "Nhập chỉ số đo và bối cảnh đo trong cùng một màn hình.",
+        ? "Cập nhật 2 chỉ số đo và bối cảnh của buổi đo hiện tại."
+        : "Nhập 2 lần đo trong cùng một buổi; buổi đo sẽ được suy ra từ thời gian.",
     [isEditMode],
   );
 
@@ -140,6 +158,10 @@ export default function TrackingFormScreen() {
     router.replace("/(health)/tracking");
   };
 
+  const goToTrackingList = () => {
+    router.replace("/(health)/tracking");
+  };
+
   const goAfterSubmit = () => {
     if (isEditMode && recordId) {
       router.replace({
@@ -149,7 +171,10 @@ export default function TrackingFormScreen() {
       return;
     }
 
-    router.replace("/(health)/tracking");
+    router.replace({
+      pathname: "/(health)/tracking",
+      params: { refreshAt: `${Date.now()}` },
+    });
   };
 
   useEffect(() => {
@@ -161,7 +186,10 @@ export default function TrackingFormScreen() {
           params: { id: recordId },
         });
       } else {
-        router.replace("/(health)/tracking");
+        router.replace({
+          pathname: "/(health)/tracking",
+          params: { refreshAt: `${Date.now()}` },
+        });
       }
     }, 2500);
     return () => clearTimeout(timeout);
@@ -183,6 +211,10 @@ export default function TrackingFormScreen() {
   };
 
   const formDisabled = loadingInitial || isSubmitting || navigatingAfterWarning;
+  const shouldShowEditInitialState = isEditMode && (loadingInitial || initialLoadError);
+  const initialLoadLooksNotFound =
+    initialLoadError?.toLowerCase().includes("not found") ||
+    initialLoadError?.toLowerCase().includes("không tìm thấy");
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
@@ -202,68 +234,164 @@ export default function TrackingFormScreen() {
           <Text style={styles.pageSubtitle}>{subtitle}</Text>
         </View>
 
-        <Card style={styles.stageCard}>
-          <Card.Content>
-            <SectionHeading
-              title="Thông tin lần đo"
-              subtitle="Nhập chỉ số chính và thời gian đo nếu bạn muốn lưu cụ thể."
-            />
+        {shouldShowEditInitialState ? (
+          <Card style={styles.stageCard}>
+            <Card.Content>
+              {loadingInitial ? (
+                <View style={styles.initialStateWrap}>
+                  <ActivityIndicator
+                    size="large"
+                    color={MEDICAL_COLORS.primary}
+                  />
+                  <Text style={styles.initialStateTitle}>Đang tải bản ghi</Text>
+                  <Text style={styles.initialStateText}>
+                    Vui lòng chờ trong giây lát.
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.initialStateWrap}>
+                  <Text style={styles.initialStateTitle}>
+                    {initialLoadLooksNotFound
+                      ? "Không tìm thấy bản ghi huyết áp"
+                      : "Không thể tải dữ liệu bản ghi"}
+                  </Text>
+                  <Text style={styles.initialStateText}>
+                    {initialLoadError ??
+                      "Bản ghi không sẵn sàng để chỉnh sửa. Vui lòng thử lại."}
+                  </Text>
 
-            <View style={styles.bpRow}>
-              <View style={styles.bpField}>
-                <Text style={styles.fieldLabel}>Tâm thu</Text>
+                  <View style={styles.initialStateActions}>
+                    {!initialLoadLooksNotFound ? (
+                      <Button
+                        mode="contained"
+                        buttonColor={MEDICAL_COLORS.primary}
+                        style={styles.initialStateButton}
+                        onPress={retryLoadRecord}
+                      >
+                        Thử lại
+                      </Button>
+                    ) : null}
+
+                    <Button
+                      mode={initialLoadLooksNotFound ? "contained" : "outlined"}
+                      buttonColor={
+                        initialLoadLooksNotFound
+                          ? MEDICAL_COLORS.primary
+                          : undefined
+                      }
+                      style={styles.initialStateButton}
+                      onPress={goToTrackingList}
+                    >
+                      Về danh sách
+                    </Button>
+                  </View>
+                </View>
+              )}
+            </Card.Content>
+          </Card>
+        ) : (
+          <>
+            <Card style={styles.stageCard}>
+              <Card.Content>
+                <SectionHeading
+                  title="Thông tin buổi đo"
+                  subtitle="Nhập 2 lần đo trong cùng một buổi. Hệ thống tự suy ra sáng/tối từ thời gian đo."
+                />
+
+                <Text style={styles.groupLabel}>Lần đo 1</Text>
+                <View style={styles.bpRow}>
+                  <View style={styles.bpField}>
+                    <Text style={styles.fieldLabel}>Tâm thu</Text>
+                    <TextInput
+                      value={reading1Systolic}
+                      onChangeText={setReading1Systolic}
+                      mode="outlined"
+                      keyboardType="number-pad"
+                      placeholder="Ví dụ 120"
+                      style={styles.textInput}
+                      outlineStyle={styles.inputOutline}
+                      editable={!formDisabled}
+                    />
+                  </View>
+
+                  <View style={styles.bpField}>
+                    <Text style={styles.fieldLabel}>Tâm trương</Text>
+                    <TextInput
+                      value={reading1Diastolic}
+                      onChangeText={setReading1Diastolic}
+                      mode="outlined"
+                      keyboardType="number-pad"
+                      placeholder="Ví dụ 80"
+                      style={styles.textInput}
+                      outlineStyle={styles.inputOutline}
+                      editable={!formDisabled}
+                    />
+                  </View>
+                </View>
+
+                <Text style={styles.groupLabel}>Lần đo 2</Text>
+                <View style={styles.bpRow}>
+                  <View style={styles.bpField}>
+                    <Text style={styles.fieldLabel}>Tâm thu</Text>
+                    <TextInput
+                      value={reading2Systolic}
+                      onChangeText={setReading2Systolic}
+                      mode="outlined"
+                      keyboardType="number-pad"
+                      placeholder="Ví dụ 118"
+                      style={styles.textInput}
+                      outlineStyle={styles.inputOutline}
+                      editable={!formDisabled}
+                    />
+                  </View>
+
+                  <View style={styles.bpField}>
+                    <Text style={styles.fieldLabel}>Tâm trương</Text>
+                    <TextInput
+                      value={reading2Diastolic}
+                      onChangeText={setReading2Diastolic}
+                      mode="outlined"
+                      keyboardType="number-pad"
+                      placeholder="Ví dụ 78"
+                      style={styles.textInput}
+                      outlineStyle={styles.inputOutline}
+                      editable={!formDisabled}
+                    />
+                  </View>
+                </View>
+
+                <Text style={styles.fieldLabel}>Thời gian đo cụ thể</Text>
                 <TextInput
-                  value={systolic}
-                  onChangeText={setSystolic}
+                  value={measuredAt}
+                  onChangeText={setMeasuredAt}
                   mode="outlined"
-                  keyboardType="number-pad"
-                  placeholder="Ví dụ 120"
+                  placeholder="YYYY-MM-DD HH:mm"
                   style={styles.textInput}
                   outlineStyle={styles.inputOutline}
-                  editable={!formDisabled}
+                  editable={!formDisabled && !isEditMode}
+                  right={
+                    <TextInput.Icon
+                      icon="clock-outline"
+                      onPress={fillMeasuredAtNow}
+                      disabled={formDisabled || isEditMode}
+                      forceTextInputFocus={false}
+                    />
+                  }
                 />
-              </View>
+                <HelperText type="info" style={styles.helperText}>
+                  {isEditMode
+                    ? "Ngày giờ được giữ nguyên khi chỉnh sửa buổi đo."
+                    : "Bạn có thể để trống nếu muốn dùng thời điểm lưu hiện tại."}
+                </HelperText>
+              </Card.Content>
+            </Card>
 
-              <View style={styles.bpField}>
-                <Text style={styles.fieldLabel}>Tâm trương</Text>
-                <TextInput
-                  value={diastolic}
-                  onChangeText={setDiastolic}
-                  mode="outlined"
-                  keyboardType="number-pad"
-                  placeholder="Ví dụ 80"
-                  style={styles.textInput}
-                  outlineStyle={styles.inputOutline}
-                  editable={!formDisabled}
+            <Card style={styles.stageCard}>
+              <Card.Content>
+                <SectionHeading
+                  title="Bối cảnh đo"
+                  subtitle="Những thông tin này áp dụng cho cả 2 lần đo trong buổi."
                 />
-              </View>
-            </View>
-
-            <Text style={styles.fieldLabel}>Thời gian đo cụ thể</Text>
-            <TextInput
-              value={measuredAt}
-              onChangeText={setMeasuredAt}
-              mode="outlined"
-              placeholder="YYYY-MM-DD HH:mm"
-              style={styles.textInput}
-              outlineStyle={styles.inputOutline}
-              editable={!formDisabled && !isEditMode}
-              right={<TextInput.Icon icon="clock-outline" />}
-            />
-            <HelperText type="info" style={styles.helperText}>
-              {isEditMode
-                ? "Ngày giờ được giữ nguyên khi chỉnh sửa bản ghi."
-                : "Bạn có thể để trống nếu muốn dùng thời điểm lưu hiện tại."}
-            </HelperText>
-          </Card.Content>
-        </Card>
-
-        <Card style={styles.stageCard}>
-          <Card.Content>
-            <SectionHeading
-              title="Bối cảnh đo"
-              subtitle="Những thông tin này giúp bản ghi có ngữ cảnh tốt hơn về sau."
-            />
 
             <Text style={styles.groupLabel}>Nguồn đo</Text>
             <View style={styles.choiceWrap}>
@@ -273,23 +401,6 @@ export default function TrackingFormScreen() {
                   label={item}
                   selected={bpSource === item}
                   onPress={() => setBpSource(item)}
-                />
-              ))}
-            </View>
-
-            <Text style={styles.groupLabel}>Thời điểm đo</Text>
-            <View style={styles.choiceWrap}>
-              {[
-                { label: "Sáng", value: "morning" as DayPeriod },
-                { label: "Chiều", value: "afternoon" as DayPeriod },
-                { label: "Tối", value: "evening" as DayPeriod },
-                { label: "Ban đêm", value: "night" as DayPeriod },
-              ].map((item) => (
-                <SelectChip
-                  key={item.value}
-                  label={item.label}
-                  selected={dayPeriod === item.value}
-                  onPress={() => setDayPeriod(item.value)}
                 />
               ))}
             </View>
@@ -361,28 +472,30 @@ export default function TrackingFormScreen() {
           </Card.Content>
         </Card>
 
-        <View style={styles.footerActions}>
-          <Button
-            mode="outlined"
-            style={styles.secondaryButton}
-            onPress={goAfterCancel}
-            disabled={formDisabled}
-          >
-            Hủy
-          </Button>
+            <View style={styles.footerActions}>
+              <Button
+                mode="outlined"
+                style={styles.secondaryButton}
+                onPress={goAfterCancel}
+                disabled={formDisabled}
+              >
+                Hủy
+              </Button>
 
-          <Button
-            mode="contained"
-            style={styles.primaryButton}
-            contentStyle={styles.primaryButtonContent}
-            buttonColor={MEDICAL_COLORS.primary}
-            onPress={handleSubmit}
-            loading={isSubmitting}
-            disabled={formDisabled}
-          >
-            {isEditMode ? "Lưu thay đổi" : "Tạo bản ghi"}
-          </Button>
-        </View>
+              <Button
+                mode="contained"
+                style={styles.primaryButton}
+                contentStyle={styles.primaryButtonContent}
+                buttonColor={MEDICAL_COLORS.primary}
+                onPress={handleSubmit}
+                loading={isSubmitting}
+                disabled={formDisabled}
+              >
+                {isEditMode ? "Lưu thay đổi" : "Tạo bản ghi"}
+              </Button>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       <Snackbar
@@ -555,6 +668,34 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     color: MEDICAL_COLORS.primaryDark,
     fontWeight: "600",
+  },
+  initialStateWrap: {
+    alignItems: "center",
+    paddingVertical: 28,
+    paddingHorizontal: 8,
+  },
+  initialStateTitle: {
+    marginTop: 14,
+    marginBottom: 8,
+    textAlign: "center",
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: "900",
+    color: MEDICAL_COLORS.text,
+  },
+  initialStateText: {
+    textAlign: "center",
+    fontSize: 14,
+    lineHeight: 21,
+    color: MEDICAL_COLORS.textMuted,
+  },
+  initialStateActions: {
+    marginTop: 20,
+    width: "100%",
+    gap: 10,
+  },
+  initialStateButton: {
+    borderRadius: 16,
   },
   footerActions: {
     marginTop: 4,

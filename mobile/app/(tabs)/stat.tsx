@@ -5,7 +5,7 @@ import type {
   MeasurementQualityItem,
 } from "@/src/features/reports/types/report.types";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
@@ -16,7 +16,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
-import { Card, Chip, Divider, Snackbar, Text } from "react-native-paper";
+import { Card, Chip, Snackbar, Text } from "react-native-paper";
 
 const CLINICAL_FACT_LABELS: Record<string, string> = {
   diabetes: 'Tiểu đường', smoking: 'Hút thuốc', overweight: 'Thừa cân/béo phì',
@@ -50,6 +50,7 @@ const COLORS = {
   warning: "#E7A33C",
   danger: "#D95C5C",
   info: "#4E8CFA",
+  white: "#FFFFFF",
 };
 
 
@@ -57,11 +58,9 @@ export default function StatScreen() {
   const {
     report,
     isLoading,
-    isRefreshing,
     isGenerating,
     error,
     loadLatestReport,
-    refreshReport,
     generateReport,
     clearError,
   } = useReports();
@@ -84,51 +83,35 @@ export default function StatScreen() {
     );
   }
 
-  if (!report) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centerWrap}>
-          <View style={styles.emptyIconWrap}>
-            <MaterialCommunityIcons name="chart-line" size={42} color={COLORS.primary} />
-          </View>
-          <Text style={styles.emptyTitle}>Chưa có báo cáo</Text>
-          <Text style={styles.emptySubtitle}>
-            Nhấn bên dưới để tạo báo cáo lâm sàng từ dữ liệu huyết áp của bạn.
-          </Text>
-          <Pressable
-            style={[styles.generateBtn, isGenerating && styles.generateBtnDisabled]}
-            onPress={generateReport}
-            disabled={isGenerating}
-          >
-            {isGenerating
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <MaterialCommunityIcons name="file-chart-outline" size={20} color="#fff" />
-            }
-            <Text style={styles.generateBtnText}>
-              {isGenerating ? "Đang tạo báo cáo..." : "Tạo báo cáo mới"}
-            </Text>
-          </Pressable>
-        </View>
-        <Snackbar visible={Boolean(error)} onDismiss={clearError}>{error}</Snackbar>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.contentContainer}
         refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={refreshReport} />
+          <RefreshControl refreshing={isLoading} onRefresh={() => void loadLatestReport()} />
         }
         showsVerticalScrollIndicator={false}
       >
-        <ClinicalReportCard
-          report={report}
-          generating={isGenerating}
-          onGenerate={generateReport}
-        />
+        {report ? (
+          <ClinicalReportCard
+            report={report}
+            generating={isGenerating}
+            onGenerate={generateReport}
+          />
+        ) : (
+          <Card style={styles.sectionCard}>
+            <Card.Content style={styles.emptyReportCard}>
+              <MaterialCommunityIcons name="chart-line" size={42} color={COLORS.primary} />
+              <Text style={styles.emptyTitle}>Chưa có báo cáo</Text>
+              <Text style={styles.emptySubtitle}>Tạo báo cáo tuần này từ dữ liệu đo huyết áp đã ghi nhận.</Text>
+              <Pressable style={styles.generateBtn} onPress={generateReport} disabled={isGenerating}>
+                {isGenerating ? <ActivityIndicator size="small" color="#fff" /> : <MaterialCommunityIcons name="refresh" size={16} color="#fff" />}
+                <Text style={styles.generateBtnText}>{isGenerating ? "Đang tạo..." : "Tạo báo cáo"}</Text>
+              </Pressable>
+            </Card.Content>
+          </Card>
+        )}
       </ScrollView>
       <Snackbar visible={Boolean(error)} onDismiss={clearError}>{error}</Snackbar>
     </SafeAreaView>
@@ -199,6 +182,11 @@ function getPhenotypeLabel(v?: string) {
     case "sustained_hypertension": return "Tăng huyết áp bền vững";
     case "white_coat_hypertension": return "Tăng huyết áp áo trắng";
     case "masked_hypertension": return "Tăng huyết áp ẩn";
+    case "white_coat": return "Tăng huyết áp áo trắng";
+    case "masked": return "Tăng huyết áp ẩn";
+    case "sustained": return "Tăng huyết áp bền vững";
+    case "none": return "Không ghi nhận kiểu hình tăng huyết áp";
+    case "unknown": return "Chưa xác định";
     case "normal": return "Bình thường";
     default: return v ?? "—";
   }
@@ -213,7 +201,7 @@ function getConfidenceLabel(v?: string) {
   }
 }
 
-function getQualityColor(level?: string) {
+function getQualityColor(level?: string | null) {
   switch (level) {
     case "high": return COLORS.success;
     case "medium": return COLORS.warning;
@@ -222,7 +210,7 @@ function getQualityColor(level?: string) {
   }
 }
 
-function getQualityLevelLabel(level?: string) {
+function getQualityLevelLabel(level?: string | null) {
   switch (level) {
     case "high": return "Cao";
     case "medium": return "Trung bình";
@@ -236,8 +224,16 @@ function getSourceLabel(source: string) {
     case "clinic": return "Đo tại phòng khám";
     case "home": return "Đo tại nhà";
     case "abpm_24h": return "ABPM 24 giờ";
+    case "hbpm": return "Đo tại nhà";
+    case "obpm": return "Đo tại phòng khám";
+    case "abpm": return "ABPM 24 giờ";
     default: return source;
   }
+}
+
+function getSourceUsedLabel(source?: string) {
+  if (!source) return null;
+  return getSourceLabel(source);
 }
 
 function formatBp(sys?: number | null, dia?: number | null) {
@@ -254,7 +250,7 @@ function MeasurementQualityCard({ items, averages }: { items: MeasurementQuality
   return (
     <Card style={styles.sectionCard}>
       <Card.Content>
-        <SectionHeader icon="gauge" title="Chất lượng đo lường" />
+        <SectionHeader icon="gauge" title="Độ tin cậy dữ liệu đo" />
         {items.map((item) => {
           const avgKey = item.source === "abpm_24h" ? "abpm" : item.source as keyof BpAverages;
           const avg = averages?.[avgKey];
@@ -270,9 +266,12 @@ function MeasurementQualityCard({ items, averages }: { items: MeasurementQuality
                 </View>
               </View>
               <View style={styles.qualityMeta}>
-                <Text style={styles.qualityScore}>Điểm: {(item.qualityScore * 100).toFixed(0)}/100</Text>
-                {bpStr && <Text style={styles.qualityBpAvg}>TB: {bpStr}</Text>}
-                {!item.usable && <Text style={styles.qualityUnusable}>Không sử dụng được</Text>}
+                <Text style={styles.qualityScore}>
+                  Điểm: {item.qualityScore == null ? "—" : `${(item.qualityScore * 100).toFixed(0)}/100`}
+                </Text>
+                {bpStr && <Text style={styles.qualityBpAvg}>Tổng hợp: {bpStr}</Text>}
+                {item.usable === false && <Text style={styles.qualityUnusable}>Không sử dụng được</Text>}
+                {item.usable === null && <Text style={styles.qualityUnknown}>Chưa xác định khả dụng</Text>}
               </View>
               {item.flags.length > 0 && (
                 <View style={styles.flagsWrap}>
@@ -298,15 +297,125 @@ function formatTimestamp(v?: string | null) {
   return d.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function ClinicalReportCard({
+function getAverageForSource(averages?: BpAverages, source?: string) {
+  if (!averages) return null;
+  const key = source === "abpm_24h" || source === "ABPM" ? "abpm" : source === "clinic" || source === "OBPM" ? "clinic" : "home";
+  return averages[key as keyof BpAverages] ?? null;
+}
+
+function getPatientSummaryText(category?: string) {
+  switch (category) {
+    case "normal":
+      return "Các chỉ số hiện tại nằm trong vùng bình thường. Hãy tiếp tục duy trì thói quen đo đều đặn.";
+    case "elevated":
+      return "Chỉ số có xu hướng cao hơn mức tối ưu. Đây là thời điểm phù hợp để theo dõi sát hơn và điều chỉnh lối sống.";
+    case "hypertension":
+      return "Chỉ số phù hợp với tăng huyết áp. Bạn nên theo dõi đều và trao đổi với nhân viên y tế nếu kết quả lặp lại nhiều lần.";
+    default:
+      return "Chưa đủ dữ liệu để kết luận chắc chắn. Hãy tiếp tục ghi nhận các buổi đo sáng và tối.";
+  }
+}
+
+function getDataConfidenceText(level?: string) {
+  switch (level) {
+    case "high": return "Dữ liệu đo khá đầy đủ, kết quả có thể dùng để tham khảo tốt.";
+    case "medium": return "Dữ liệu có thể dùng để tham khảo, nhưng đo thêm vài ngày sẽ giúp kết quả chắc chắn hơn.";
+    case "low": return "Dữ liệu còn ít hoặc chưa đủ đều. Kết quả chỉ nên xem là gợi ý ban đầu.";
+    default: return "Chưa đủ thông tin để đánh giá độ tin cậy của dữ liệu đo.";
+  }
+}
+
+const REPORT_TABS = [
+  { key: "overview", label: "Tổng quan", icon: "heart-pulse" },
+  { key: "advice", label: "Khuyến nghị", icon: "lightbulb-outline" },
+  { key: "risk", label: "Nguy cơ", icon: "heart-cog-outline" },
+  { key: "data", label: "Dữ liệu", icon: "database-eye-outline" },
+] as const;
+
+type ReportTab = typeof REPORT_TABS[number]["key"];
+
+function formatDateShort(value?: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+}
+
+function formatWeekRange(report: HealthReport) {
+  if (report.weekStart && report.weekEnd) {
+    return `Tuần ${formatDateShort(report.weekStart)} - ${formatDateShort(report.weekEnd)}`;
+  }
+  return formatTimestamp(report.createdAt ?? report.classification?.dataTimestamp) ?? "Báo cáo huyết áp";
+}
+
+function getReportAverageText(report: HealthReport) {
+  const avg = getAverageForSource(report.classification?.averages, report.classification?.sourceUsed);
+  return avg ? formatBp(avg.systolic, avg.diastolic) : null;
+}
+
+function getReportPrimaryQuality(report: HealthReport) {
+  const quality = report.classification?.measurementQuality;
+  return quality?.find((item) => item.source === report.classification?.sourceUsed)
+    ?? quality?.find((item) => item.usable)
+    ?? quality?.[0]
+    ?? null;
+}
+
+export function ReportListScreen({
+  reports,
+  onOpenReport,
+}: {
+  reports: HealthReport[];
+  onOpenReport: (report: HealthReport) => void;
+}) {
+  return (
+    <View style={{ gap: 14 }}>
+      {reports.length === 0 ? (
+        <Card style={styles.sectionCard}>
+          <Card.Content style={styles.emptyReportCard}>
+            <MaterialCommunityIcons name="chart-line" size={42} color={COLORS.primary} />
+            <Text style={styles.emptyTitle}>Chưa có báo cáo</Text>
+            <Text style={styles.emptySubtitle}>Tạo báo cáo tuần này từ dữ liệu đo huyết áp đã ghi nhận.</Text>
+          </Card.Content>
+        </Card>
+      ) : reports.map((item) => {
+        const avgText = getReportAverageText(item);
+        const quality = getReportPrimaryQuality(item);
+        return (
+          <Pressable key={item.id ?? `${item.weekStart}-${item.createdAt}`} onPress={() => onOpenReport(item)}>
+            <Card style={styles.reportListCard}>
+              <Card.Content>
+                <View style={styles.reportCardHeader}>
+                  <Text style={styles.reportWeekTitle}>{formatWeekRange(item)}</Text>
+                  <MaterialCommunityIcons name="chevron-right" size={22} color={COLORS.textMuted} />
+                </View>
+                <Text style={[styles.reportCategoryTitle, { color: getBpCategoryColor(item.classification?.bpCategory) }]}>{getBpCategoryLabel(item.classification?.bpCategory)}</Text>
+                <View style={styles.reportListMeta}>
+                  <Text style={styles.reportListMetaText}>Huyết áp: {avgText ?? "—"}</Text>
+                  <Text style={styles.reportListMetaText}>Độ tin cậy: {getQualityLevelLabel(quality?.qualityLevel)}</Text>
+                  <Text style={styles.reportListMetaText}>Cập nhật: {formatTimestamp(item.updatedAt ?? item.createdAt) ?? "—"}</Text>
+                </View>
+              </Card.Content>
+            </Card>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+export function ClinicalReportCard({
   report,
   generating,
   onGenerate,
+  onBack,
 }: {
   report: HealthReport;
   generating: boolean;
   onGenerate: () => void;
+  onBack?: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<ReportTab>("overview");
   const cls = report.classification ?? {};
   const risk = report.risk;
   const ml = report.mlRisk;
@@ -314,6 +423,12 @@ function ClinicalReportCard({
   const facts = report.clinicalFacts ?? {};
   const measurementQuality = cls.measurementQuality;
   const averages = cls.averages;
+  const sourceLabel = getSourceUsedLabel(cls.sourceUsed) ?? "dữ liệu đã ghi nhận";
+  const mainAverage = getAverageForSource(averages, cls.sourceUsed);
+  const mainAverageText = mainAverage ? formatBp(mainAverage.systolic, mainAverage.diastolic) : null;
+  const primaryQuality = measurementQuality?.find((item) => item.source === cls.sourceUsed)
+    ?? measurementQuality?.find((item) => item.usable)
+    ?? measurementQuality?.[0];
 
   const allFacts = Object.entries(facts).flatMap(([group, keys]) =>
     Object.entries(keys)
@@ -323,18 +438,23 @@ function ClinicalReportCard({
 
   return (
     <View style={{ gap: 14 }}>
-      {/* Header */}
       <View style={styles.reportHeader}>
+        {onBack && (
+          <Pressable style={styles.backButton} onPress={onBack}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.primary} />
+          </Pressable>
+        )}
         <View style={styles.reportHeaderIcon}>
-          <MaterialCommunityIcons name="stethoscope" size={24} color={COLORS.primary} />
+          <MaterialCommunityIcons name="heart-pulse" size={24} color={COLORS.primary} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.reportHeaderTitle}>Báo cáo lâm sàng</Text>
+          <Text style={styles.reportHeaderTitle}>Báo cáo sức khỏe của bạn</Text>
+          <Text style={styles.reportHeaderSub}>{formatWeekRange(report)}</Text>
           {!!cls.dataTimestamp && (
             <Text style={styles.reportHeaderSub}>Cập nhật: {formatTimestamp(cls.dataTimestamp)}</Text>
           )}
           {report.pipelineRan && (
-            <Chip style={styles.liveChip} textStyle={styles.liveChipText}>Vừa phân tích</Chip>
+            <Chip style={styles.liveChip} textStyle={styles.liveChipText}>Đã phân tích dữ liệu mới</Chip>
           )}
         </View>
         <Pressable
@@ -352,59 +472,67 @@ function ClinicalReportCard({
         </Pressable>
       </View>
 
-      {/* Phân loại huyết áp */}
-      <Card style={styles.sectionCard}>
-        <Card.Content>
-          <SectionHeader icon="heart-pulse" title="Phân loại huyết áp" />
-          <View style={styles.categoryBadgeRow}>
-            <View style={[styles.categoryBadge, { backgroundColor: `${getBpCategoryColor(cls.bpCategory)}18`, borderColor: `${getBpCategoryColor(cls.bpCategory)}50` }]}>
-              <Text style={[styles.categoryBadgeText, { color: getBpCategoryColor(cls.bpCategory) }]}>
-                {getBpCategoryLabel(cls.bpCategory)}
-              </Text>
-            </View>
-            {!!cls.bpStage && (
-              <View style={styles.stageBadge}>
-                <Text style={styles.stageBadgeText}>{cls.bpStage}</Text>
-              </View>
-            )}
-          </View>
-          <Divider style={styles.divider} />
-          {!!cls.phenotype && <InfoRow label="Kiểu hình" value={getPhenotypeLabel(cls.phenotype)} />}
-          {!!cls.sourceUsed && <InfoRow label="Nguồn đo dùng phân tích" value={cls.sourceUsed} />}
-          {!!cls.confidence && <InfoRow label="Độ tin cậy" value={getConfidenceLabel(cls.confidence)} />}
-          {!!cls.dataSource && <InfoRow label="Dữ liệu từ" value={cls.dataSource === "live" ? "Phân tích mới" : "Lần đo lưu trữ"} />}
-        </Card.Content>
-      </Card>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
+        {REPORT_TABS.map((tab) => {
+          const active = activeTab === tab.key;
+          return (
+            <Pressable key={tab.key} style={[styles.tabButton, active && styles.tabButtonActive]} onPress={() => setActiveTab(tab.key)}>
+              <MaterialCommunityIcons name={tab.icon as never} size={16} color={active ? COLORS.white : COLORS.primary} />
+              <Text style={[styles.tabButtonText, active && styles.tabButtonTextActive]}>{tab.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
 
-      {/* Chất lượng đo lường */}
-      {measurementQuality && measurementQuality.length > 0 && (
-        <MeasurementQualityCard items={measurementQuality} averages={averages} />
+      {activeTab === "overview" && (
+        <>
+          <Card style={[styles.sectionCard, styles.summaryCard]}>
+            <Card.Content>
+              <Text style={styles.summaryLabel}>Kết quả tổng quan</Text>
+              <Text style={[styles.summaryTitle, { color: getBpCategoryColor(cls.bpCategory) }]}>{getBpCategoryLabel(cls.bpCategory)}</Text>
+              <Text style={styles.summaryText}>{getPatientSummaryText(cls.bpCategory)}</Text>
+              <View style={styles.summaryMetricRow}>
+                <View style={styles.summaryMetricBox}>
+                  <Text style={styles.summaryMetricLabel}>Huyết áp tổng hợp</Text>
+                  <Text style={styles.summaryMetricValue}>{mainAverageText ?? "—"}</Text>
+                </View>
+                <View style={styles.summaryMetricBox}>
+                  <Text style={styles.summaryMetricLabel}>Dựa trên</Text>
+                  <Text style={styles.summaryMetricValueSmall}>{sourceLabel}</Text>
+                </View>
+              </View>
+            </Card.Content>
+          </Card>
+          {!!reasoning && (
+            <Card style={styles.sectionCard}>
+              <Card.Content>
+                <SectionHeader icon="text-box-outline" title="Kết quả này có nghĩa là gì?" />
+                {!!reasoning.explanation && <Text style={styles.bodyText}>{reasoning.explanation}</Text>}
+                {!!cls.phenotype && <InfoRow label="Kiểu huyết áp" value={getPhenotypeLabel(cls.phenotype)} />}
+                {!!cls.confidence && <InfoRow label="Mức chắc chắn" value={getConfidenceLabel(cls.confidence)} />}
+              </Card.Content>
+            </Card>
+          )}
+        </>
       )}
 
-      {/* Lý giải lâm sàng */}
-      {!!reasoning && (
+      {activeTab === "advice" && (
         <Card style={styles.sectionCard}>
           <Card.Content>
-            <SectionHeader icon="text-box-outline" title="Lý giải lâm sàng" />
-            {!!reasoning.explanation && <Text style={styles.bodyText}>{reasoning.explanation}</Text>}
-            {!!reasoning.recommendation && (
-              <View style={styles.recommendationBox}>
-                <MaterialCommunityIcons name="lightbulb-outline" size={16} color={COLORS.primary} style={{ marginTop: 2 }} />
-                <Text style={styles.recommendationText}>{reasoning.recommendation}</Text>
-              </View>
-            )}
-            {!!reasoning.confidence && <InfoRow label="Độ tin cậy lý giải" value={getConfidenceLabel(reasoning.confidence)} />}
+            <SectionHeader icon="lightbulb-outline" title="Bạn nên làm gì tiếp?" />
+            <View style={styles.recommendationBox}>
+              <MaterialCommunityIcons name="check-circle-outline" size={18} color={COLORS.primary} style={{ marginTop: 2 }} />
+              <Text style={styles.recommendationText}>{reasoning?.recommendation ?? "Tiếp tục đo huyết áp đều đặn vào buổi sáng và buổi tối. Khi có thêm dữ liệu, hãy tạo lại báo cáo để kết quả chính xác hơn."}</Text>
+            </View>
           </Card.Content>
         </Card>
       )}
 
-      {/* Nguy cơ tim mạch (Stage 2) */}
-      {!!risk && (
-        <Card style={styles.sectionCard}>
-          <Card.Content>
-            <SectionHeader icon="heart-cog-outline" title="Nguy cơ tim mạch" />
-            <View style={[styles.categoryBadge, { backgroundColor: `${getRiskColor(risk.riskLevel)}18`, borderColor: `${getRiskColor(risk.riskLevel)}50`, marginBottom: 12 }]}>
-              <Text style={[styles.categoryBadgeText, { color: getRiskColor(risk.riskLevel) }]}>
+      {activeTab === "risk" && (
+        <>
+          {!!risk && <Card style={styles.sectionCard}><Card.Content><SectionHeader icon="heart-cog-outline" title="Nguy cơ tim mạch" />
+            <View style={[styles.categoryBadge, { backgroundColor: `${getRiskColor(risk.riskLevel)}18`, borderColor: `${getRiskColor(risk.riskLevel)}50`, marginBottom: 12 }]}> 
+              <Text style={[styles.categoryBadgeText, { color: getRiskColor(risk.riskLevel) }]}> 
                 {getRiskLabel(risk.riskLevel)}
               </Text>
             </View>
@@ -418,15 +546,9 @@ function ClinicalReportCard({
             {!!risk.confidence && <InfoRow label="Độ tin cậy" value={getConfidenceLabel(risk.confidence)} />}
             {!!risk.dataSource && <InfoRow label="Dữ liệu từ" value={risk.dataSource === "live" ? "Phân tích mới" : "Lần đánh giá lưu trữ"} />}
             {!!risk.dataTimestamp && <InfoRow label="Thời điểm đánh giá" value={formatTimestamp(risk.dataTimestamp) ?? "—"} />}
-          </Card.Content>
-        </Card>
-      )}
-
-      {/* Nguy cơ ML */}
-      {!!ml && (
-        <Card style={styles.sectionCard}>
-          <Card.Content>
-            <SectionHeader icon="brain" title="Đánh giá nguy cơ (AI)" />
+          </Card.Content></Card>}
+          {!!ml && <Card style={styles.sectionCard}><Card.Content>
+            <SectionHeader icon="brain" title="Ước tính nguy cơ bổ sung" />
             <View style={styles.mlRow}>
               <View style={styles.mlScoreBox}>
                 <Text style={styles.mlScoreLabel}>Điểm nguy cơ</Text>
@@ -444,15 +566,22 @@ function ClinicalReportCard({
               </View>
             </View>
             {!!ml.modelVersion && <InfoRow label="Phiên bản mô hình" value={ml.modelVersion} />}
-          </Card.Content>
-        </Card>
+          </Card.Content></Card>}
+          {!risk && !ml && <Text style={styles.emptyTabText}>Chưa có phần đánh giá nguy cơ trong báo cáo này.</Text>}
+        </>
       )}
 
-      {/* Yếu tố lâm sàng */}
-      {allFacts.length > 0 && (
-        <Card style={styles.sectionCard}>
-          <Card.Content>
-            <SectionHeader icon="clipboard-list-outline" title="Yếu tố lâm sàng đã ghi nhận" />
+      {activeTab === "data" && (
+        <>
+          {primaryQuality && <Card style={styles.sectionCard}><Card.Content><SectionHeader icon="shield-check-outline" title="Độ tin cậy của kết quả" />
+            <View style={styles.confidenceRow}>
+              <View style={[styles.qualityBadge, { backgroundColor: `${getQualityColor(primaryQuality.qualityLevel)}18`, borderColor: `${getQualityColor(primaryQuality.qualityLevel)}50` }]}><Text style={[styles.qualityBadgeText, { color: getQualityColor(primaryQuality.qualityLevel) }]}>{getQualityLevelLabel(primaryQuality.qualityLevel)}</Text></View>
+              <Text style={styles.qualityScore}>{primaryQuality.qualityScore == null ? "Chưa có điểm" : `${(primaryQuality.qualityScore * 100).toFixed(0)}/100`}</Text>
+            </View>
+            <Text style={styles.bodyText}>{getDataConfidenceText(primaryQuality.qualityLevel ?? cls.confidence)}</Text>
+          </Card.Content></Card>}
+          {measurementQuality && measurementQuality.length > 0 && <MeasurementQualityCard items={measurementQuality} averages={averages} />}
+          {allFacts.length > 0 && <Card style={styles.sectionCard}><Card.Content><SectionHeader icon="clipboard-list-outline" title="Yếu tố sức khỏe đã ghi nhận" />
             <View style={styles.pillWrap}>
               {allFacts.map(({ group, key }) => (
                 <View key={`${group}-${key}`} style={styles.factPill}>
@@ -460,8 +589,8 @@ function ClinicalReportCard({
                 </View>
               ))}
             </View>
-          </Card.Content>
-        </Card>
+          </Card.Content></Card>}
+        </>
       )}
     </View>
   );
@@ -479,6 +608,7 @@ const styles = StyleSheet.create({
 
   // Report header
   reportHeader: { flexDirection: "row", alignItems: "flex-start", gap: 14, backgroundColor: COLORS.surface, borderRadius: 24, padding: 18, borderWidth: 1, borderColor: COLORS.border },
+  backButton: { width: 38, height: 38, borderRadius: 14, backgroundColor: COLORS.surfaceSoft, borderWidth: 1, borderColor: COLORS.border, alignItems: "center", justifyContent: "center" },
   reportHeaderIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: `${COLORS.primary}14`, alignItems: "center", justifyContent: "center" },
   reportHeaderTitle: { fontSize: 22, fontWeight: "900", color: COLORS.text, marginBottom: 4 },
   reportHeaderSub: { fontSize: 13, color: COLORS.textMuted },
@@ -488,10 +618,36 @@ const styles = StyleSheet.create({
   generateBtnDisabled: { opacity: 0.6 },
   generateBtnText: { color: "#fff", fontSize: 13, fontWeight: "800" },
 
+  // Report filters & tabs
+  reportListCard: { borderRadius: 18, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, overflow: "hidden" },
+  reportCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8 },
+  reportWeekTitle: { flex: 1, fontSize: 14, fontWeight: "900", color: COLORS.text },
+  reportCategoryTitle: { fontSize: 22, fontWeight: "900", marginBottom: 10 },
+  reportListMeta: { gap: 5 },
+  reportListMetaText: { fontSize: 13, color: COLORS.textMuted, fontWeight: "700" },
+  emptyReportCard: { alignItems: "center", paddingVertical: 24 },
+  tabRow: { gap: 8, paddingRight: 8 },
+  tabButton: { minHeight: 38, flexDirection: "row", alignItems: "center", gap: 6, borderRadius: 19, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, paddingHorizontal: 13 },
+  tabButtonActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  tabButtonText: { fontSize: 13, fontWeight: "800", color: COLORS.primary },
+  tabButtonTextActive: { color: COLORS.white },
+  emptyTabText: { fontSize: 14, lineHeight: 22, color: COLORS.textMuted, textAlign: "center", padding: 18 },
+
   // Section card
   sectionCard: { borderRadius: 22, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, overflow: "hidden" },
   sectionHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 14 },
   sectionHeaderText: { fontSize: 17, fontWeight: "900", color: COLORS.text },
+
+  // Patient summary
+  summaryCard: { borderColor: `${COLORS.primary}35`, backgroundColor: COLORS.surface },
+  summaryLabel: { fontSize: 13, fontWeight: "800", color: COLORS.textMuted, marginBottom: 6 },
+  summaryTitle: { fontSize: 30, fontWeight: "900", marginBottom: 8 },
+  summaryText: { fontSize: 15, lineHeight: 23, color: COLORS.text, marginBottom: 14 },
+  summaryMetricRow: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
+  summaryMetricBox: { flex: 1, minWidth: 130, backgroundColor: COLORS.surfaceSoft, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: COLORS.border },
+  summaryMetricLabel: { fontSize: 12, color: COLORS.textMuted, fontWeight: "700", marginBottom: 5 },
+  summaryMetricValue: { fontSize: 18, color: COLORS.text, fontWeight: "900" },
+  summaryMetricValueSmall: { fontSize: 14, color: COLORS.text, fontWeight: "800" },
 
   // Info row
   infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.border },
@@ -525,6 +681,7 @@ const styles = StyleSheet.create({
   factPillGroup: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
 
   // Measurement quality
+  confidenceRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10 },
   qualityItem: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
   qualityItemHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
   qualitySourceLabel: { fontSize: 14, fontWeight: "700", color: COLORS.text },
@@ -534,6 +691,7 @@ const styles = StyleSheet.create({
   qualityScore: { fontSize: 13, color: COLORS.textMuted },
   qualityBpAvg: { fontSize: 13, fontWeight: "600", color: COLORS.text },
   qualityUnusable: { fontSize: 12, color: COLORS.danger, fontWeight: "700" },
+  qualityUnknown: { fontSize: 12, color: COLORS.textMuted, fontWeight: "700" },
   flagsWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
   flagPill: { backgroundColor: `${COLORS.warning}18`, borderRadius: 8, borderWidth: 1, borderColor: `${COLORS.warning}40`, paddingHorizontal: 8, paddingVertical: 3 },
   flagPillText: { fontSize: 11, color: COLORS.warning, fontWeight: "700" },

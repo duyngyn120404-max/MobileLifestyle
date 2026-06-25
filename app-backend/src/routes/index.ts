@@ -3,6 +3,7 @@ import { Router } from "express";
 import { services } from "../config/services.js";
 import { authMiddleware } from "../middlewares/auth.middleware.js";
 import { aiProxyRoutes } from "../modules/ai-proxy/ai-proxy.routes.js";
+import { odooReviewRoutes } from "../modules/odoo-review/odoo-review.routes.js";
 import { profileRoutes } from "../modules/profile/profile.routes.js";
 import { sendSuccess } from "../shared/http/response.js";
 
@@ -28,3 +29,4 @@ routes.get("/me", authMiddleware, (request, response) => {
 
 routes.use("/profile", profileRoutes);
 routes.use("/ai", aiProxyRoutes);
+routes.use("/odoo", odooReviewRoutes);
