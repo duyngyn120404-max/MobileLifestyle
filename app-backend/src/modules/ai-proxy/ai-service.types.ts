@@ -95,6 +95,7 @@ export interface AiServiceSaveMeasurementSessionRequest {
   position: AiServicePositionType;
   restedMinutes: number | null;
   deviceType: AiServiceDeviceType;
+  deviceName: string | null;
   deviceValidated: boolean;
   readings: AiServiceSaveBpReadingRequest[];
 }
@@ -108,6 +109,7 @@ export interface AiServiceMeasurementSessionResponse {
   position: string | null;
   restedMinutes: number | null;
   deviceType: string | null;
+  deviceName: string | null;
   deviceValidated: boolean | null;
   readings: AiServiceBpReadingResponse[];
   warnings?: string[];

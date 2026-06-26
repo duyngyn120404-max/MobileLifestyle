@@ -15,6 +15,7 @@ const EMPTY_FORM: MeasurementSessionFormValues = {
   position: "sitting",
   restedMinutes: "",
   deviceType: "upper_arm",
+  deviceName: "",
   deviceValidated: true,
   measuredAt: "",
 };
@@ -83,6 +84,7 @@ export function useHealthForm(recordId: string | null, isEditMode: boolean) {
           restedMinutes:
             record.restedMinutes === null ? "" : String(record.restedMinutes),
           deviceType: record.deviceType === "wrist" ? "wrist" : "upper_arm",
+          deviceName: record.deviceName ?? "",
           deviceValidated: Boolean(record.deviceValidated),
           measuredAt: toInputDateTime(record.measuredAt),
         });

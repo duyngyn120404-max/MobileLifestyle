@@ -267,6 +267,11 @@ export default function TrackingDetailScreen() {
                   icon="medical-bag"
                 />
                 <DetailRow
+                  label="Tên thiết bị"
+                  value={record.deviceName || "—"}
+                  icon="card-account-details-outline"
+                />
+                <DetailRow
                   label="Tình trạng kiểm định"
                   value={
                     record.deviceValidated ? "Đã kiểm định" : "Chưa kiểm định"

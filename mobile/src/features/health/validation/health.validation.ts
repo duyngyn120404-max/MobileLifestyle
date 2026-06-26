@@ -163,6 +163,7 @@ export function toMeasurementSessionRequest(
       position: values.position,
       restedMinutes,
       deviceType: values.deviceType,
+      deviceName: values.deviceName.trim() || null,
       deviceValidated: values.deviceValidated,
       readings: [
         { systolic: first.systolic, diastolic: first.diastolic },

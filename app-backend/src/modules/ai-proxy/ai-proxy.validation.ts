@@ -120,6 +120,7 @@ export function validateMeasurementSession(body: unknown): SaveMeasurementSessio
     "position",
     "restedMinutes",
     "deviceType",
+    "deviceName",
     "deviceValidated",
     "readings",
   ];
@@ -136,9 +137,15 @@ export function validateMeasurementSession(body: unknown): SaveMeasurementSessio
     payload.restedMinutes === null
       ? null
       : requireNumber(payload, "restedMinutes", 0, 180);
+  const deviceName =
+    payload.deviceName === undefined || payload.deviceName === null
+      ? null
+      : typeof payload.deviceName === "string"
+        ? payload.deviceName.trim() || null
+        : validationError("deviceName must be a string or null");
 
-  if (!Array.isArray(payload.readings) || payload.readings.length < 2) {
-    return validationError("readings must contain at least 2 readings");
+  if (!Array.isArray(payload.readings) || payload.readings.length < 1) {
+    return validationError("readings must contain at least 1 reading");
   }
 
   const readings = payload.readings.map((entry, index) => {
@@ -164,6 +171,7 @@ export function validateMeasurementSession(body: unknown): SaveMeasurementSessio
     position: requireEnum(payload.position, POSITIONS, "position"),
     restedMinutes,
     deviceType: requireEnum(payload.deviceType, DEVICE_TYPES, "deviceType"),
+    deviceName,
     deviceValidated: payload.deviceValidated,
     readings,
   };

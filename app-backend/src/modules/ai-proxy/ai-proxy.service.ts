@@ -6,6 +6,7 @@ import {
   toAiServiceRiskProfileRequest,
   toPublicBpRecord,
   toPublicBpRecordList,
+  toPublicChatMessage,
   toPublicConversationList,
   toPublicConversationSummary,
   toPublicGenerateReportResponse,
@@ -65,8 +66,21 @@ export const aiProxyService = {
 
   async submitInteraction(conversationId: string, body: unknown, accessToken: string) {
     const request = toAiServiceInteractionRequest(validateInteraction(body));
+    const id = requireId(conversationId, "conversationId");
+    if (request.type === "user_message") {
+      const result = await aiServiceClient.post<unknown>(
+        `/conversations/${id}/messages`,
+        {
+          content: request.content,
+          ...(request.intent === undefined ? {} : { intent: request.intent }),
+        },
+        accessToken,
+      );
+      return { messages: [toPublicChatMessage(result)] };
+    }
+
     const result = await aiServiceClient.post<unknown>(
-      `/conversations/${requireId(conversationId, "conversationId")}/interactions`,
+      `/conversations/${id}/interactions`,
       request,
       accessToken,
     );

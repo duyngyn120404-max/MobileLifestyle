@@ -2,7 +2,7 @@ import type { RequestHandler } from "express";
 
 import { env } from "../config/env.js";
 
-const ALLOWED_METHODS = "GET,POST,PATCH,DELETE,OPTIONS";
+const ALLOWED_METHODS = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
 const ALLOWED_HEADERS = "Authorization,Content-Type";
 const isDevelopment = env.nodeEnv !== "production";
 

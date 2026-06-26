@@ -43,6 +43,7 @@ const DEVICE_TYPES = ["upper_arm", "wrist"] as const;
 const ACTION_STATUSES = ["pending", "accepted", "rejected"] as const;
 const CONFIDENCE_LEVELS = ["high", "medium", "low"] as const;
 const RISK_LEVELS = ["low", "medium", "moderate", "high", "very_high"] as const;
+const DATA_SOURCES = ["live", "stored"] as const;
 
 function invalidResponse(message: string): never {
   throw new AppError(
@@ -106,7 +107,12 @@ function asStringArray(value: unknown, name: string): string[] {
 }
 
 function optionalStrings(value: unknown, name: string): string[] | undefined {
-  return value === undefined ? undefined : asStringArray(value, name);
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed ? [trimmed] : [];
+  }
+  return asStringArray(value, name);
 }
 
 function optionalString(value: unknown, name: string): string | undefined {
@@ -136,12 +142,22 @@ function nullableBoolean(value: unknown, name: string): boolean | null {
   return asBoolean(value, name);
 }
 
+function field(payload: Record<string, unknown>, primary: string, fallback: string): unknown {
+  return payload[primary] === undefined ? payload[fallback] : payload[primary];
+}
+
 function optionalEnum<T extends string>(
   value: unknown,
   allowed: readonly T[],
   name: string,
 ): T | undefined {
   return value === undefined ? undefined : asEnum(value, allowed, name);
+}
+
+function optionalDataSource(value: unknown, name: string): "live" | "stored" | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (value === "cached") return "stored";
+  return asEnum(value, DATA_SOURCES, name);
 }
 
 export function toAiServiceCreateConversationRequest(
@@ -195,6 +211,7 @@ export function toAiServiceMeasurementSessionRequest(
     position: request.position,
     restedMinutes: request.restedMinutes,
     deviceType: request.deviceType,
+    deviceName: request.deviceName,
     deviceValidated: request.deviceValidated,
     readings: request.readings.map((reading) => ({
       systolic: reading.systolic,
@@ -218,8 +235,8 @@ export function toPublicConversationSummary(value: unknown): ConversationSummary
   const parsed: AiServiceConversationSummary = {
     id: asString(payload.id, "conversation.id"),
     title: asString(payload.title, "conversation.title"),
-    createdAt: asString(payload.createdAt, "conversation.createdAt"),
-    updatedAt: asString(payload.updatedAt, "conversation.updatedAt"),
+    createdAt: asString(field(payload, "createdAt", "created_at"), "conversation.createdAt"),
+    updatedAt: asString(field(payload, "updatedAt", "updated_at"), "conversation.updatedAt"),
   };
   return { ...parsed };
 }
@@ -263,10 +280,10 @@ export function toPublicChatMessage(value: unknown): ChatMessage {
         : invalidResponse("message.actions must be an array");
   const parsed: AiServiceChatMessage = {
     id: asString(payload.id, "message.id"),
-    conversationId: asString(payload.conversationId, "message.conversationId"),
+    conversationId: asString(field(payload, "conversationId", "conversation_id"), "message.conversationId"),
     role: asEnum(payload.role, ["user", "assistant"] as const, "message.role"),
     content: asString(payload.content, "message.content"),
-    createdAt: asString(payload.createdAt, "message.createdAt"),
+    createdAt: asString(field(payload, "createdAt", "created_at"), "message.createdAt"),
     ...(actions === undefined ? {} : { actions }),
   };
   return { ...parsed };
@@ -337,6 +354,7 @@ export function toPublicMeasurementSession(value: unknown): MeasurementSession {
     position: nullableString(payload.position, "measurementSession.position"),
     restedMinutes: nullableNumber(payload.restedMinutes, "measurementSession.restedMinutes"),
     deviceType: nullableString(payload.deviceType, "measurementSession.deviceType"),
+    deviceName: nullableString(payload.deviceName, "measurementSession.deviceName"),
     deviceValidated: nullableBoolean(payload.deviceValidated, "measurementSession.deviceValidated"),
     readings: payload.readings.map(toPublicBpReading),
     ...(payload.warnings === undefined
@@ -369,15 +387,17 @@ export function toPublicRiskProfile(value: unknown): RiskProfile {
 
 function toPublicBpAverage(value: unknown, name: string) {
   const payload = asObject(value, name);
+  const systolic = field(payload, "systolic", "sys");
+  const diastolic = field(payload, "diastolic", "dia");
   return {
     systolic:
-      payload.systolic === null
+      systolic === null || systolic === undefined
         ? null
-        : asNumber(payload.systolic, `${name}.systolic`),
+        : asNumber(systolic, `${name}.systolic`),
     diastolic:
-      payload.diastolic === null
+      diastolic === null || diastolic === undefined
         ? null
-        : asNumber(payload.diastolic, `${name}.diastolic`),
+        : asNumber(diastolic, `${name}.diastolic`),
   };
 }
 
@@ -385,22 +405,24 @@ function toPublicReport(value: unknown): HealthReport {
   const payload = asObject(value, "report");
   const classificationPayload = asObject(payload.classification, "report.classification");
   const averagesPayload =
-    classificationPayload.averages === undefined
+    classificationPayload.averages === undefined || classificationPayload.averages === null
       ? undefined
       : asObject(classificationPayload.averages, "report.classification.averages");
   const measurementQuality =
-    classificationPayload.measurementQuality === undefined
+    classificationPayload.measurementQuality === undefined || classificationPayload.measurementQuality === null
       ? undefined
       : Array.isArray(classificationPayload.measurementQuality)
         ? classificationPayload.measurementQuality.map((entry) => {
             const item = asObject(entry, "report.classification.measurementQuality item");
+            const qualityScore = field(item, "qualityScore", "quality_score");
+            const qualityLevel = field(item, "qualityLevel", "quality_level");
             return {
               source: asString(item.source, "measurementQuality.source"),
-              qualityScore: nullableNumber(item.qualityScore, "measurementQuality.qualityScore"),
+              qualityScore: nullableNumber(qualityScore, "measurementQuality.qualityScore"),
               qualityLevel:
-                item.qualityLevel === null || item.qualityLevel === undefined
+                qualityLevel === null || qualityLevel === undefined
                   ? null
-                  : asEnum(item.qualityLevel, CONFIDENCE_LEVELS, "measurementQuality.qualityLevel"),
+                  : asEnum(qualityLevel, CONFIDENCE_LEVELS, "measurementQuality.qualityLevel"),
               usable: nullableBoolean(item.usable, "measurementQuality.usable"),
               flags:
                 item.flags === null || item.flags === undefined
@@ -426,9 +448,9 @@ function toPublicReport(value: unknown): HealthReport {
     ...(optionalEnum(classificationPayload.confidence, CONFIDENCE_LEVELS, "report.classification.confidence") === undefined
       ? {}
       : { confidence: asEnum(classificationPayload.confidence, CONFIDENCE_LEVELS, "report.classification.confidence") }),
-    ...(optionalEnum(classificationPayload.dataSource, ["live", "stored"] as const, "report.classification.dataSource") === undefined
+    ...(optionalDataSource(classificationPayload.dataSource, "report.classification.dataSource") === undefined
       ? {}
-      : { dataSource: asEnum(classificationPayload.dataSource, ["live", "stored"] as const, "report.classification.dataSource") }),
+      : { dataSource: optionalDataSource(classificationPayload.dataSource, "report.classification.dataSource") }),
     ...(classificationPayload.dataTimestamp === undefined || classificationPayload.dataTimestamp === null
       ? {}
       : { dataTimestamp: asString(classificationPayload.dataTimestamp, "report.classification.dataTimestamp") }),
@@ -465,7 +487,7 @@ function toPublicReport(value: unknown): HealthReport {
             ...(optionalString(item.recommendation, "report.risk.recommendation") === undefined ? {} : { recommendation: asString(item.recommendation, "report.risk.recommendation") }),
             ...(optionalString(item.explanation, "report.risk.explanation") === undefined ? {} : { explanation: asString(item.explanation, "report.risk.explanation") }),
             ...(optionalEnum(item.confidence, CONFIDENCE_LEVELS, "report.risk.confidence") === undefined ? {} : { confidence: asEnum(item.confidence, CONFIDENCE_LEVELS, "report.risk.confidence") }),
-            ...(optionalEnum(item.dataSource, ["live", "stored"] as const, "report.risk.dataSource") === undefined ? {} : { dataSource: asEnum(item.dataSource, ["live", "stored"] as const, "report.risk.dataSource") }),
+            ...(optionalDataSource(item.dataSource, "report.risk.dataSource") === undefined ? {} : { dataSource: optionalDataSource(item.dataSource, "report.risk.dataSource") }),
             ...(item.dataTimestamp === undefined || item.dataTimestamp === null ? {} : { dataTimestamp: asString(item.dataTimestamp, "report.risk.dataTimestamp") }),
           };
         })();

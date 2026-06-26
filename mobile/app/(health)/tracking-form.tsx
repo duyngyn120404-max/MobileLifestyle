@@ -99,6 +99,7 @@ export default function TrackingFormScreen() {
     position,
     restedMinutes,
     deviceType,
+    deviceName,
     deviceValidated,
     measuredAt,
   } = values;
@@ -110,6 +111,7 @@ export default function TrackingFormScreen() {
   const setPosition = (value: PositionType) => updateField("position", value);
   const setRestedMinutes = (value: string) => updateField("restedMinutes", value);
   const setDeviceType = (value: DeviceType) => updateField("deviceType", value);
+  const setDeviceName = (value: string) => updateField("deviceName", value);
   const setDeviceValidated = (value: boolean) => updateField("deviceValidated", value);
   const setMeasuredAt = (value: string) => updateField("measuredAt", value);
   const fillMeasuredAtNow = () => {
@@ -435,6 +437,17 @@ export default function TrackingFormScreen() {
                 />
               ))}
             </View>
+
+            <Text style={styles.fieldLabel}>Tên thiết bị</Text>
+            <TextInput
+              value={deviceName}
+              onChangeText={setDeviceName}
+              mode="outlined"
+              placeholder="Ví dụ Omron HEM-7120"
+              style={styles.textInput}
+              outlineStyle={styles.inputOutline}
+              editable={!formDisabled}
+            />
 
             <Text style={styles.fieldLabel}>Số phút nghỉ trước khi đo</Text>
             <TextInput

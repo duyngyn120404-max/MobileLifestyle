@@ -100,6 +100,7 @@ export interface SaveMeasurementSessionRequest {
   position: PositionType;
   restedMinutes: number | null;
   deviceType: DeviceType;
+  deviceName: string | null;
   deviceValidated: boolean;
   readings: SaveBpReadingRequest[];
 }
@@ -113,6 +114,7 @@ export interface MeasurementSession {
   position: string | null;
   restedMinutes: number | null;
   deviceType: string | null;
+  deviceName: string | null;
   deviceValidated: boolean | null;
   readings: BpReading[];
   warnings?: string[];
