@@ -3,11 +3,9 @@ import { ERROR_CODES } from "../../shared/errors/error-codes.js";
 import type {
   BpSource,
   CreateConversationRequest,
-  DayPeriod,
   DeviceType,
   IntentMode,
   PositionType,
-  SaveBpRecordRequest,
   SaveMeasurementSessionRequest,
   SaveRiskProfileRequest,
   SubmitInteractionRequest,
@@ -20,7 +18,6 @@ const INTENT_MODES: IntentMode[] = [
   "data_collection",
 ];
 const BP_SOURCES: BpSource[] = ["HBPM", "OBPM", "ABPM"];
-const DAY_PERIODS: DayPeriod[] = ["morning", "afternoon", "evening", "night"];
 const POSITIONS: PositionType[] = ["sitting", "standing", "lying"];
 const DEVICE_TYPES: DeviceType[] = ["upper_arm", "wrist"];
 
@@ -56,57 +53,6 @@ function requireEnum<T extends string>(
   }
   return value as T;
 }
-
-export function validateBpRecord(body: unknown): SaveBpRecordRequest {
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return validationError("Blood pressure payload must be an object");
-  }
-
-  const payload = body as Record<string, unknown>;
-  const allowedFields = [
-    "systolic",
-    "diastolic",
-    "source",
-    "dayPeriod",
-    "position",
-    "restedMinutes",
-    "deviceType",
-    "deviceValidated",
-    "measuredAt",
-  ];
-  if (Object.keys(payload).some((field) => !allowedFields.includes(field))) {
-    return validationError("Blood pressure payload contains invalid fields");
-  }
-
-  const systolic = requireNumber(payload, "systolic", 40, 300);
-  const diastolic = requireNumber(payload, "diastolic", 30, 200);
-  if (systolic <= diastolic) {
-    return validationError("systolic must be greater than diastolic");
-  }
-  const restedMinutes =
-    payload.restedMinutes === null
-      ? null
-      : requireNumber(payload, "restedMinutes", 0, 180);
-  if (typeof payload.deviceValidated !== "boolean") {
-    return validationError("deviceValidated must be a boolean");
-  }
-  if (typeof payload.measuredAt !== "string" || Number.isNaN(Date.parse(payload.measuredAt))) {
-    return validationError("measuredAt must be a valid date");
-  }
-
-  return {
-    systolic,
-    diastolic,
-    source: requireEnum(payload.source, BP_SOURCES, "source"),
-    dayPeriod: requireEnum(payload.dayPeriod, DAY_PERIODS, "dayPeriod"),
-    position: requireEnum(payload.position, POSITIONS, "position"),
-    restedMinutes,
-    deviceType: requireEnum(payload.deviceType, DEVICE_TYPES, "deviceType"),
-    deviceValidated: payload.deviceValidated,
-    measuredAt: new Date(payload.measuredAt).toISOString(),
-  };
-}
-
 
 export function validateMeasurementSession(body: unknown): SaveMeasurementSessionRequest {
   if (!body || typeof body !== "object" || Array.isArray(body)) {

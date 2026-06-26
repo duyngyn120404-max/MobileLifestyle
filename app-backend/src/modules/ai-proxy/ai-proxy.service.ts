@@ -1,11 +1,8 @@
 import {
-  toAiServiceBpRecordRequest,
   toAiServiceCreateConversationRequest,
   toAiServiceInteractionRequest,
   toAiServiceMeasurementSessionRequest,
   toAiServiceRiskProfileRequest,
-  toPublicBpRecord,
-  toPublicBpRecordList,
   toPublicChatMessage,
   toPublicConversationList,
   toPublicConversationSummary,
@@ -21,7 +18,6 @@ import {
 import { aiServiceClient } from "./ai-service.client.js";
 import {
   requireId,
-  validateBpRecord,
   validateCreateConversation,
   validateDateFilter,
   validateInteraction,
@@ -86,57 +82,6 @@ export const aiProxyService = {
     );
     return toPublicInteractionResponse(result);
   },
-
-  async listBpRecords(query: Record<string, unknown>, accessToken: string) {
-    const parameters = new URLSearchParams();
-    const fromDate = validateDateFilter(query.fromDate, "fromDate");
-    const toDate = validateDateFilter(query.toDate, "toDate");
-    if (fromDate) parameters.set("fromDate", fromDate);
-    if (toDate) parameters.set("toDate", toDate);
-    const suffix = parameters.size ? `?${parameters.toString()}` : "";
-    const result = await aiServiceClient.get<unknown>(
-      `/health-data/bp-records${suffix}`,
-      accessToken,
-    );
-    return toPublicBpRecordList(result);
-  },
-
-  async getBpRecord(recordId: string, accessToken: string) {
-    const result = await aiServiceClient.get<unknown>(
-      `/health-data/bp-records/${encodeURIComponent(requireId(recordId, "recordId"))}`,
-      accessToken,
-    );
-    return toPublicBpRecord(result);
-  },
-
-  async createBpRecord(body: unknown, accessToken: string) {
-    const request = toAiServiceBpRecordRequest(validateBpRecord(body));
-    const result = await aiServiceClient.post<unknown>(
-      "/health-data/bp-records",
-      request,
-      accessToken,
-    );
-    return toPublicBpRecord(result);
-  },
-
-  async updateBpRecord(recordId: string, body: unknown, accessToken: string) {
-    const request = toAiServiceBpRecordRequest(validateBpRecord(body));
-    const result = await aiServiceClient.patch<unknown>(
-      `/health-data/bp-records/${encodeURIComponent(requireId(recordId, "recordId"))}`,
-      request,
-      accessToken,
-    );
-    return toPublicBpRecord(result);
-  },
-
-  async deleteBpRecord(recordId: string, accessToken: string) {
-    await aiServiceClient.delete(
-      `/health-data/bp-records/${encodeURIComponent(requireId(recordId, "recordId"))}`,
-      accessToken,
-    );
-    return { deleted: true };
-  },
-
 
   async listMeasurementSessions(query: Record<string, unknown>, accessToken: string) {
     const parameters = new URLSearchParams();

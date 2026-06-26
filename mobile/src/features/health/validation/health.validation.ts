@@ -1,7 +1,5 @@
 import type {
-  BpRecordFormValues,
   MeasurementSessionFormValues,
-  SaveBpRecordRequest,
   SaveMeasurementSessionRequest,
   SaveRiskProfileRequest,
 } from "@/src/features/health/types/health.types";
@@ -51,59 +49,6 @@ function toVietnamIsoString(date: Date): string {
 
   return `${yyyy}-${mm}-${dd}T${hh}:${min}:${ss}+07:00`;
 }
-
-export function toBpRecordRequest(
-  values: BpRecordFormValues,
-): { payload?: SaveBpRecordRequest; error?: string } {
-  if (!values.systolic.trim() || !values.diastolic.trim()) {
-    return { error: "Vui lòng nhập đầy đủ tâm thu và tâm trương" };
-  }
-
-  const systolic = Number(values.systolic);
-  const diastolic = Number(values.diastolic);
-  if (!Number.isFinite(systolic) || !Number.isFinite(diastolic)) {
-    return { error: "Chỉ số huyết áp phải là số hợp lệ" };
-  }
-  if (systolic < 40 || systolic > 300) {
-    return { error: "Tâm thu cần nằm trong khoảng hợp lý" };
-  }
-  if (diastolic < 30 || diastolic > 200) {
-    return { error: "Tâm trương cần nằm trong khoảng hợp lý" };
-  }
-  if (systolic <= diastolic) {
-    return { error: "Tâm thu phải lớn hơn tâm trương" };
-  }
-
-  const restedMinutes = values.restedMinutes.trim()
-    ? Number(values.restedMinutes)
-    : null;
-  if (
-    restedMinutes !== null &&
-    (!Number.isFinite(restedMinutes) || restedMinutes < 0 || restedMinutes > 180)
-  ) {
-    return { error: "Số phút nghỉ cần là số hợp lệ từ 0 đến 180" };
-  }
-
-  const parsedMeasuredAt = parseLocalDateTimeInput(values.measuredAt);
-  if (!parsedMeasuredAt || Number.isNaN(parsedMeasuredAt.getTime())) {
-    return { error: "Thời gian đo không hợp lệ" };
-  }
-
-  return {
-    payload: {
-      systolic,
-      diastolic,
-      source: values.source,
-      dayPeriod: values.dayPeriod,
-      position: values.position,
-      restedMinutes,
-      deviceType: values.deviceType,
-      deviceValidated: values.deviceValidated,
-      measuredAt: toVietnamIsoString(parsedMeasuredAt),
-    },
-  };
-}
-
 
 function parseBpReading(
   systolicText: string,

@@ -7,10 +7,8 @@ import type {
   SubmitInteractionResponse,
 } from "@/src/features/chatbot/types/chatbot.types";
 import type {
-  BpRecord,
   MeasurementSession,
   RiskProfile,
-  SaveBpRecordRequest,
   SaveMeasurementSessionRequest,
   SaveRiskProfileRequest,
 } from "@/src/features/health/types/health.types";
@@ -43,31 +41,6 @@ export const aiProxyClient = {
       payload,
     );
   },
-
-  listBpRecords(filters: { fromDate?: string | null; toDate?: string | null } = {}) {
-    const query = new URLSearchParams();
-    if (filters.fromDate) query.set("fromDate", filters.fromDate);
-    if (filters.toDate) query.set("toDate", filters.toDate);
-    const suffix = query.toString() ? `?${query.toString()}` : "";
-    return apiClient.get<BpRecord[]>(`${API_ROUTES.ai.bpRecords}${suffix}`);
-  },
-
-  getBpRecord(recordId: string) {
-    return apiClient.get<BpRecord>(API_ROUTES.ai.bpRecord(recordId));
-  },
-
-  createBpRecord(payload: SaveBpRecordRequest) {
-    return apiClient.post<BpRecord>(API_ROUTES.ai.bpRecords, payload);
-  },
-
-  updateBpRecord(recordId: string, payload: SaveBpRecordRequest) {
-    return apiClient.patch<BpRecord>(API_ROUTES.ai.bpRecord(recordId), payload);
-  },
-
-  deleteBpRecord(recordId: string) {
-    return apiClient.delete<{ deleted: true }>(API_ROUTES.ai.bpRecord(recordId));
-  },
-
 
   listMeasurementSessions(filters: { fromDate?: string | null; toDate?: string | null } = {}) {
     const query = new URLSearchParams();

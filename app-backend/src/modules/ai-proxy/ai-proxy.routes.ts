@@ -3,25 +3,20 @@ import { Router } from "express";
 import { authMiddleware } from "../../middlewares/auth.middleware.js";
 import { asyncHandler } from "../../middlewares/async-handler.js";
 import {
-  createBpRecord,
   createConversation,
   createMeasurementSession,
-  deleteBpRecord,
   deleteMeasurementSession,
   deleteConversation,
-  getBpRecord,
   getRiskProfile,
   getLatestReport,
   generateReport,
   getMeasurementSession,
   listReports,
-  listBpRecords,
   listMeasurementSessions,
   listConversations,
   listMessages,
   saveRiskProfile,
   submitInteraction,
-  updateBpRecord,
   updateMeasurementSession,
 } from "./ai-proxy.controller.js";
 
@@ -33,11 +28,6 @@ aiProxyRoutes.post("/conversations", asyncHandler(createConversation));
 aiProxyRoutes.delete("/conversations/:conversationId", asyncHandler(deleteConversation));
 aiProxyRoutes.get("/conversations/:conversationId/messages", asyncHandler(listMessages));
 aiProxyRoutes.post("/conversations/:conversationId/interactions", asyncHandler(submitInteraction));
-aiProxyRoutes.get("/health-data/bp-records", asyncHandler(listBpRecords));
-aiProxyRoutes.get("/health-data/bp-records/:recordId", asyncHandler(getBpRecord));
-aiProxyRoutes.post("/health-data/bp-records", asyncHandler(createBpRecord));
-aiProxyRoutes.patch("/health-data/bp-records/:recordId", asyncHandler(updateBpRecord));
-aiProxyRoutes.delete("/health-data/bp-records/:recordId", asyncHandler(deleteBpRecord));
 aiProxyRoutes.get("/health-data/measurement-sessions", asyncHandler(listMeasurementSessions));
 aiProxyRoutes.get("/health-data/measurement-sessions/:sessionId", asyncHandler(getMeasurementSession));
 aiProxyRoutes.post("/health-data/measurement-sessions", asyncHandler(createMeasurementSession));

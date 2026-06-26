@@ -1,7 +1,6 @@
 import { AppError } from "../../shared/errors/app-error.js";
 import { ERROR_CODES } from "../../shared/errors/error-codes.js";
 import type {
-  AiServiceBpRecordResponse,
   AiServiceChatMessage,
   AiServiceConversationSummary,
   AiServiceCreateConversationRequest,
@@ -13,12 +12,10 @@ import type {
   AiServiceMeasurementSessionResponse,
   AiServiceReportsListResponse,
   AiServiceRiskProfileResponse,
-  AiServiceSaveBpRecordRequest,
   AiServiceSaveMeasurementSessionRequest,
   AiServiceSaveRiskProfileRequest,
 } from "./ai-service.types.js";
 import type {
-  BpRecord,
   ChatMessage,
   ConversationSummary,
   CreateConversationRequest,
@@ -29,7 +26,6 @@ import type {
   PendingAction,
   ReportsListResponse,
   RiskProfile,
-  SaveBpRecordRequest,
   SaveMeasurementSessionRequest,
   SaveRiskProfileRequest,
   SubmitInteractionRequest,
@@ -37,7 +33,6 @@ import type {
 } from "./ai-proxy.types.js";
 
 const BP_SOURCES = ["HBPM", "OBPM", "ABPM"] as const;
-const DAY_PERIODS = ["morning", "afternoon", "evening", "night"] as const;
 const POSITIONS = ["sitting", "standing", "lying"] as const;
 const DEVICE_TYPES = ["upper_arm", "wrist"] as const;
 const ACTION_STATUSES = ["pending", "accepted", "rejected"] as const;
@@ -185,23 +180,6 @@ export function toAiServiceInteractionRequest(
   };
 }
 
-export function toAiServiceBpRecordRequest(
-  request: SaveBpRecordRequest,
-): AiServiceSaveBpRecordRequest {
-  return {
-    systolic: request.systolic,
-    diastolic: request.diastolic,
-    source: request.source,
-    dayPeriod: request.dayPeriod,
-    position: request.position,
-    restedMinutes: request.restedMinutes,
-    deviceType: request.deviceType,
-    deviceValidated: request.deviceValidated,
-    measuredAt: request.measuredAt,
-  };
-}
-
-
 export function toAiServiceMeasurementSessionRequest(
   request: SaveMeasurementSessionRequest,
 ): AiServiceSaveMeasurementSessionRequest {
@@ -301,32 +279,6 @@ export function toPublicInteractionResponse(value: unknown): SubmitInteractionRe
   };
   return { messages: parsed.messages };
 }
-
-export function toPublicBpRecord(value: unknown): BpRecord {
-  const payload = asObject(value, "bp record");
-  const parsed: AiServiceBpRecordResponse = {
-    id: asString(payload.id, "bpRecord.id"),
-    systolic: asNumber(payload.systolic, "bpRecord.systolic"),
-    diastolic: asNumber(payload.diastolic, "bpRecord.diastolic"),
-    source: nullableString(payload.source, "bpRecord.source"),
-    dayPeriod: nullableString(payload.dayPeriod, "bpRecord.dayPeriod"),
-    position: nullableString(payload.position, "bpRecord.position"),
-    restedMinutes: nullableNumber(payload.restedMinutes, "bpRecord.restedMinutes"),
-    deviceType: nullableString(payload.deviceType, "bpRecord.deviceType"),
-    deviceValidated: nullableBoolean(payload.deviceValidated, "bpRecord.deviceValidated"),
-    measuredAt: asString(payload.measuredAt, "bpRecord.measuredAt"),
-    ...(payload.warnings === undefined
-      ? {}
-      : { warnings: optionalStrings(payload.warnings, "bpRecord.warnings") }),
-  };
-  return { ...parsed };
-}
-
-export function toPublicBpRecordList(value: unknown): BpRecord[] {
-  if (!Array.isArray(value)) return invalidResponse("bp records must be an array");
-  return value.map(toPublicBpRecord);
-}
-
 
 function toPublicBpReading(value: unknown, index: number) {
   const payload = asObject(value, `measurementSession.readings[${index}]`);

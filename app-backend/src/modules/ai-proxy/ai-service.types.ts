@@ -48,36 +48,8 @@ export interface AiServiceInteractionResponse {
 }
 
 export type AiServiceBpSource = "HBPM" | "OBPM" | "ABPM";
-export type AiServiceDayPeriod = "morning" | "afternoon" | "evening" | "night";
 export type AiServicePositionType = "sitting" | "standing" | "lying";
 export type AiServiceDeviceType = "upper_arm" | "wrist";
-
-export interface AiServiceSaveBpRecordRequest {
-  systolic: number;
-  diastolic: number;
-  source: AiServiceBpSource;
-  dayPeriod: AiServiceDayPeriod;
-  position: AiServicePositionType;
-  restedMinutes: number | null;
-  deviceType: AiServiceDeviceType;
-  deviceValidated: boolean;
-  measuredAt: string;
-}
-
-export interface AiServiceBpRecordResponse {
-  id: string;
-  systolic: number;
-  diastolic: number;
-  source: string | null;
-  dayPeriod: string | null;
-  position: string | null;
-  restedMinutes: number | null;
-  deviceType: string | null;
-  deviceValidated: boolean | null;
-  measuredAt: string;
-  warnings?: string[];
-}
-
 
 export interface AiServiceSaveBpReadingRequest {
   systolic: number;

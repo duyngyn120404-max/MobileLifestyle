@@ -50,48 +50,6 @@ export async function submitInteraction(request: Request, response: Response) {
   return sendSuccess(response, data);
 }
 
-export async function listBpRecords(request: Request, response: Response) {
-  const data = await aiProxyService.listBpRecords(
-    request.query as Record<string, unknown>,
-    requireAccessToken(request),
-  );
-  return sendSuccess(response, data);
-}
-
-export async function getBpRecord(request: Request, response: Response) {
-  const data = await aiProxyService.getBpRecord(
-    request.params.recordId,
-    requireAccessToken(request),
-  );
-  return sendSuccess(response, data);
-}
-
-export async function createBpRecord(request: Request, response: Response) {
-  const data = await aiProxyService.createBpRecord(
-    request.body,
-    requireAccessToken(request),
-  );
-  return sendSuccess(response, data, undefined, 201);
-}
-
-export async function updateBpRecord(request: Request, response: Response) {
-  const data = await aiProxyService.updateBpRecord(
-    request.params.recordId,
-    request.body,
-    requireAccessToken(request),
-  );
-  return sendSuccess(response, data);
-}
-
-export async function deleteBpRecord(request: Request, response: Response) {
-  const data = await aiProxyService.deleteBpRecord(
-    request.params.recordId,
-    requireAccessToken(request),
-  );
-  return sendSuccess(response, data);
-}
-
-
 export async function listMeasurementSessions(request: Request, response: Response) {
   const data = await aiProxyService.listMeasurementSessions(
     request.query as Record<string, unknown>,
